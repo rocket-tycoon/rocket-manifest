@@ -36,8 +36,6 @@ tags:
     description: Work session management (on leaf features only)
   - name: Tasks
     description: Task management within sessions
-  - name: Notes
-    description: Implementation notes
   - name: Health
     description: Server health checks
 
@@ -366,23 +364,6 @@ paths:
                 items:
                   $ref: '#/components/schemas/FeatureHistory'
 
-  /features/{id}/notes:
-    parameters:
-      - $ref: '#/components/parameters/FeatureId'
-    get:
-      tags: [Notes]
-      summary: List implementation notes for a feature
-      operationId: listFeatureNotes
-      responses:
-        '200':
-          description: Implementation notes
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ImplementationNote'
-
   # ============================================================
   # Sessions
   # ============================================================
@@ -515,42 +496,6 @@ paths:
           description: Task updated
         '404':
           $ref: '#/components/responses/NotFound'
-
-  /tasks/{id}/notes:
-    parameters:
-      - $ref: '#/components/parameters/TaskId'
-    get:
-      tags: [Notes]
-      summary: List implementation notes for a task
-      operationId: listTaskNotes
-      responses:
-        '200':
-          description: Implementation notes
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ImplementationNote'
-    post:
-      tags: [Notes]
-      summary: Create an implementation note for a task
-      operationId: createTaskNote
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateImplementationNoteInput'
-      responses:
-        '201':
-          description: Note created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ImplementationNote'
-        '500':
-          $ref: '#/components/responses/InternalError'
 
 components:
   parameters:
@@ -1045,44 +990,3 @@ components:
         branch:
           type: string
           nullable: true
-
-    # ============================================================
-    # Implementation Note schemas
-    # ============================================================
-    ImplementationNote:
-      type: object
-      required: [id, content, files_changed, created_at]
-      properties:
-        id:
-          type: string
-          format: uuid
-        feature_id:
-          type: string
-          format: uuid
-          nullable: true
-        task_id:
-          type: string
-          format: uuid
-          nullable: true
-        content:
-          type: string
-          description: Markdown content describing implementation details
-        files_changed:
-          type: array
-          items:
-            type: string
-          description: List of files modified
-        created_at:
-          type: string
-          format: date-time
-
-    CreateImplementationNoteInput:
-      type: object
-      required: [content, files_changed]
-      properties:
-        content:
-          type: string
-        files_changed:
-          type: array
-          items:
-            type: string

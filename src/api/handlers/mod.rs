@@ -273,35 +273,4 @@ pub async fn update_task(
     }
 }
 
-// ============================================================
-// Implementation Notes
-// ============================================================
-
-pub async fn list_task_notes(
-    State(db): State<Database>,
-    Path(task_id): Path<Uuid>,
-) -> Result<Json<Vec<ImplementationNote>>, (StatusCode, String)> {
-    db.get_notes_by_task(task_id)
-        .map(Json)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
-}
-
-pub async fn list_feature_notes(
-    State(db): State<Database>,
-    Path(feature_id): Path<Uuid>,
-) -> Result<Json<Vec<ImplementationNote>>, (StatusCode, String)> {
-    db.get_notes_by_feature(feature_id)
-        .map(Json)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
-}
-
-pub async fn create_task_note(
-    State(db): State<Database>,
-    Path(task_id): Path<Uuid>,
-    Json(input): Json<CreateImplementationNoteInput>,
-) -> Result<(StatusCode, Json<ImplementationNote>), (StatusCode, String)> {
-    db.create_note_for_task(task_id, input)
-        .map(|n| (StatusCode::CREATED, Json(n)))
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
-}
 

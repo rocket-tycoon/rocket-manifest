@@ -31,7 +31,6 @@ pub fn create_router(db: Database) -> Router {
         .route("/features/{id}", delete(handlers::delete_feature))
         .route("/features/{id}/children", get(handlers::list_children))
         .route("/features/{id}/history", get(handlers::get_feature_history))
-        .route("/features/{id}/notes", get(handlers::list_feature_notes))
         // Sessions
         .route("/sessions", post(handlers::create_session))
         .route("/sessions/{id}", get(handlers::get_session))
@@ -40,8 +39,6 @@ pub fn create_router(db: Database) -> Router {
         // Tasks
         .route("/tasks/{id}", get(handlers::get_task))
         .route("/tasks/{id}", put(handlers::update_task))
-        .route("/tasks/{id}/notes", get(handlers::list_task_notes))
-        .route("/tasks/{id}/notes", post(handlers::create_task_note))
         // Health
         .route("/health", get(handlers::health));
 
