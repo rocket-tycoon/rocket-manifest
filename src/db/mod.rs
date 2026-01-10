@@ -445,6 +445,41 @@ impl Database {
         Ok(count == 0)
     }
 
+    pub fn get_feature_tree(&self, project_id: Uuid) -> Result<Vec<FeatureTreeNode>> {
+        let features = self.get_features_by_project(project_id)?;
+
+        // Group features by parent_id
+        let mut children_map: std::collections::HashMap<Option<Uuid>, Vec<Feature>> =
+            std::collections::HashMap::new();
+        for feature in features {
+            children_map
+                .entry(feature.parent_id)
+                .or_default()
+                .push(feature);
+        }
+
+        // Recursively build tree starting from roots (parent_id = None)
+        fn build_subtree(
+            parent_id: Option<Uuid>,
+            children_map: &std::collections::HashMap<Option<Uuid>, Vec<Feature>>,
+        ) -> Vec<FeatureTreeNode> {
+            children_map
+                .get(&parent_id)
+                .map(|features| {
+                    features
+                        .iter()
+                        .map(|f| FeatureTreeNode {
+                            feature: f.clone(),
+                            children: build_subtree(Some(f.id), children_map),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        }
+
+        Ok(build_subtree(None, &children_map))
+    }
+
     // ============================================================
     // Session operations
     // ============================================================
@@ -684,6 +719,47 @@ impl Database {
         })?.collect::<Result<Vec<_>, _>>()?;
 
         Ok(tasks)
+    }
+
+    pub fn create_task(&self, session_id: Uuid, input: CreateTaskInput) -> Result<Task> {
+        // Verify session exists and is active
+        let session = self.get_session(session_id)?
+            .ok_or_else(|| anyhow::anyhow!("Session not found"))?;
+
+        if session.status != SessionStatus::Active {
+            anyhow::bail!("Cannot add tasks to a completed session");
+        }
+
+        let conn = self.conn.lock().unwrap();
+        let id = Uuid::new_v4();
+        let now = Utc::now();
+
+        conn.execute(
+            "INSERT INTO tasks (id, session_id, parent_id, title, scope, status, agent_type, created_at)
+             VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)",
+            (
+                id.to_string(),
+                session_id.to_string(),
+                input.parent_id.map(|u| u.to_string()),
+                &input.title,
+                &input.scope,
+                input.agent_type.as_str(),
+                now.to_rfc3339(),
+            ),
+        )?;
+
+        Ok(Task {
+            id,
+            session_id,
+            parent_id: input.parent_id,
+            title: input.title,
+            scope: input.scope,
+            status: TaskStatus::Pending,
+            agent_type: input.agent_type,
+            worktree_path: None,
+            branch: None,
+            created_at: now,
+        })
     }
 
     pub fn update_task(&self, id: Uuid, input: UpdateTaskInput) -> Result<bool> {
