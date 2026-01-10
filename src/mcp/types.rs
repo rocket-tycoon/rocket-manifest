@@ -62,6 +62,21 @@ pub struct ListSessionTasksRequest {
     pub session_id: String,
 }
 
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct CompleteSessionRequest {
+    #[schemars(description = "The UUID of the session to complete")]
+    pub session_id: String,
+    #[schemars(description = "Summary of work done during this session - becomes the feature history entry")]
+    pub summary: String,
+    #[schemars(description = "Whether to mark the feature as 'implemented'. Defaults to true. Set to false if work is partial or feature needs more sessions.")]
+    #[serde(default = "default_true")]
+    pub mark_implemented: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
 // ============================================================
 // Response Types
 // ============================================================
@@ -106,4 +121,12 @@ pub struct SessionInfo {
 pub struct TaskListResponse {
     pub session_id: String,
     pub tasks: Vec<TaskInfo>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct CompleteSessionResponse {
+    pub session_id: String,
+    pub feature_id: String,
+    pub feature_state: String,
+    pub history_entry_id: String,
 }

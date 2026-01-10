@@ -457,6 +457,7 @@ paths:
       description: |
         Completes the session, creates a history entry, and deletes all tasks.
         The session is marked as completed and cannot be modified further.
+        Optionally updates the feature's state (e.g., to 'implemented').
       operationId: completeSession
       requestBody:
         required: true
@@ -931,6 +932,9 @@ components:
         summary:
           type: string
           description: Summary of work completed in this session
+        feature_state:
+          $ref: '#/components/schemas/FeatureState'
+          description: Optionally update the feature's state (e.g., to 'implemented')
 
     SessionCompletionResult:
       type: object

@@ -448,6 +448,7 @@ mod session_completion {
         let response = server.post(&format!("/api/v1/sessions/{}/complete", session.session.id))
             .json(&CompleteSessionInput {
                 summary: "Feature implemented".to_string(),
+                feature_state: None,
             })
             .await;
 
@@ -486,6 +487,7 @@ mod session_completion {
         server.post(&format!("/api/v1/sessions/{}/complete", session.session.id))
             .json(&CompleteSessionInput {
                 summary: "Work completed".to_string(),
+                feature_state: None,
             })
             .await;
 
@@ -504,6 +506,7 @@ mod session_completion {
         let response = server.post(&format!("/api/v1/sessions/{}/complete", fake_id))
             .json(&CompleteSessionInput {
                 summary: "Done".to_string(),
+                feature_state: None,
             })
             .await;
 

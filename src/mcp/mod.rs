@@ -241,6 +241,41 @@ impl McpServer {
 
         Ok(CallToolResult::success(vec![Content::text(json)]))
     }
+
+    #[tool(description = "Complete a session after all tasks are done. Call this when all tasks are completed to finalize the session. Creates a history entry summarizing the work and optionally marks the feature as 'implemented'. IMPORTANT: By default, this marks the feature as implemented. Set mark_implemented=false if the work is partial. Side effects: creates feature_history entry, deletes task records, updates session status to 'completed', optionally updates feature state to 'implemented'.")]
+    async fn complete_session(
+        &self,
+        params: Parameters<CompleteSessionRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let req = params.0;
+        let session_id = Self::parse_uuid(&req.session_id)?;
+
+        // Determine feature state to set
+        let feature_state = if req.mark_implemented {
+            Some(FeatureState::Implemented)
+        } else {
+            None
+        };
+
+        let result = self.db.complete_session(session_id, CompleteSessionInput {
+            summary: req.summary,
+            feature_state,
+        })
+        .map_err(|e| McpError::internal_error(e.to_string(), None))?
+        .ok_or_else(|| McpError::invalid_params("Session not found", None))?;
+
+        let response = CompleteSessionResponse {
+            session_id: result.session.id.to_string(),
+            feature_id: result.session.feature_id.to_string(),
+            feature_state: if req.mark_implemented { "implemented" } else { "unchanged" }.to_string(),
+            history_entry_id: result.history_entry.id.to_string(),
+        };
+
+        let json = serde_json::to_string_pretty(&response)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(CallToolResult::success(vec![Content::text(json)]))
+    }
 }
 
 #[tool_handler]
@@ -261,7 +296,7 @@ ORCHESTRATOR WORKFLOW (when managing a feature):
 2. Call create_task to break down work into agent-sized units
 3. Spawn agents with their task_ids
 4. Call list_session_tasks to monitor progress
-5. Complete session when all tasks are done
+5. Call complete_session when all tasks are done (marks feature as 'implemented' by default)
 
 IMPORTANT:
 - Read feature details carefully before coding

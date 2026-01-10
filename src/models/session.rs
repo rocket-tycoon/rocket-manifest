@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::feature::FeatureState;
 use super::task::CreateTaskInput;
 
 /// An active work session on a leaf feature.
@@ -95,6 +96,10 @@ pub struct SessionFeatureSummary {
 pub struct CompleteSessionInput {
     /// Summary of work done, becomes the history entry description.
     pub summary: String,
+    /// Optionally update the feature's state (e.g., to `Implemented`).
+    /// If not provided, the feature state is not changed.
+    #[serde(default)]
+    pub feature_state: Option<FeatureState>,
 }
 
 /// Result of completing a session.

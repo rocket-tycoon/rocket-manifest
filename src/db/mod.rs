@@ -626,6 +626,14 @@ impl Database {
             (now.to_rfc3339(), id.to_string()),
         )?;
 
+        // Update feature state if provided
+        if let Some(state) = input.feature_state {
+            conn.execute(
+                "UPDATE features SET state = ?, updated_at = ? WHERE id = ?",
+                (state.as_str(), now.to_rfc3339(), session.feature_id.to_string()),
+            )?;
+        }
+
         let completed_session = Session {
             id: session.id,
             feature_id: session.feature_id,

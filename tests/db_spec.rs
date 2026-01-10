@@ -607,6 +607,7 @@ speculate! {
             it "returns None for non-existent session" {
                 let result = db.complete_session(Uuid::new_v4(), CompleteSessionInput {
                     summary: "Done".to_string(),
+                    feature_state: None,
                 }).expect("Query failed");
 
                 assert!(result.is_none());
@@ -635,6 +636,7 @@ speculate! {
 
                 let result = db.complete_session(session_response.session.id, CompleteSessionInput {
                     summary: "Implemented the feature".to_string(),
+                    feature_state: None,
                 }).expect("Query failed").expect("Session not found");
 
                 assert_eq!(result.session.status, SessionStatus::Completed);
@@ -668,6 +670,7 @@ speculate! {
 
                 db.complete_session(session_response.session.id, CompleteSessionInput {
                     summary: "Done".to_string(),
+                    feature_state: None,
                 }).expect("Failed to complete");
 
                 // Task should be deleted
@@ -693,11 +696,13 @@ speculate! {
 
                 db.complete_session(session_response.session.id, CompleteSessionInput {
                     summary: "First completion".to_string(),
+                    feature_state: None,
                 }).expect("Failed to complete");
 
                 // Try to complete again
                 let result = db.complete_session(session_response.session.id, CompleteSessionInput {
                     summary: "Second completion".to_string(),
+                    feature_state: None,
                 });
 
                 assert!(result.is_err());
