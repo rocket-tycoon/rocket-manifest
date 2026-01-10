@@ -3,7 +3,7 @@ name = "rocket-manifest"
 version = "0.1.0"
 edition = "2021"
 description = "Living feature documentation server for AI-assisted development"
-license = "MIT"
+license = "BUSL-1.1"
 repository = "https://github.com/rocket-tycoon/rocket-manifest"
 
 [dependencies]

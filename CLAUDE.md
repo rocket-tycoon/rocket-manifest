@@ -24,7 +24,7 @@ Features are not work items to be closed. They are living descriptions that evol
 
 AI agents access features through deterministic MCP tools (not grep):
 - `get_task_context` - Get assigned task with feature context
-- `add_implementation_note` - Document implementation details
+- `start_task` - Signal work is beginning
 - `complete_task` - Mark task as complete
 
 Agents are scoped to their assigned task and report progress back. Tasks are small units of work (1-3 story points). AI agents manage their own internal punch lists without RocketManifest tracking granular sub-items.
@@ -59,7 +59,7 @@ speculate! {
 }
 ```
 
-Test files: `tests/db_spec.rs`, `tests/api_spec.rs` (62 tests total)
+Test files: `tests/db_spec.rs`, `tests/api_spec.rs` (58 tests total)
 
 ## Development Practices
 
@@ -84,7 +84,7 @@ src/
 │   ├── mod.rs      # Database wrapper with CRUD operations
 │   └── schema.rs   # SQLite schema (embedded, auto-migrated)
 ├── models/         # Domain types with serde + enums with as_str/from_str
-└── mcp/            # MCP server (stub - not yet implemented)
+└── mcp/            # MCP server for AI agent integration
 ```
 
 ### Data Model
@@ -102,9 +102,8 @@ Authentication/                 <- feature node with context
 ```
 
 **Permanent entities:**
-- **Feature**: Self-referential tree via `parent_id`. Any node can have content. Only **leaf nodes** can have sessions.
+- **Feature**: Self-referential tree via `parent_id`. Any node can have content (story + details). Only **leaf nodes** can have sessions.
 - **FeatureHistory**: Append-only log of implementation sessions (like `git log` for a feature). Records what was done during each session and links to git commits. This is NOT feature versioning—the feature content itself is mutable. History answers "what work was done on this feature and when?"
-- **ImplementationNote**: Notes attached to features or tasks documenting implementation details.
 
 **Ephemeral entities (exist only during active work):**
 - **Session**: One active session per feature at a time. When completed, tasks are squashed into a `feature_history` entry and deleted.
@@ -133,10 +132,9 @@ All routes prefixed with `/api/v1`:
 - Features: CRUD at `/features`, `/features/{id}`
   - `/features/{id}/children` - GET direct children
   - `/features/{id}/history` - GET feature history
-  - `/features/{id}/notes` - GET implementation notes
 - Sessions: POST `/sessions`, GET `/sessions/{id}`, `/sessions/{id}/status`
   - Only allowed on leaf features (returns 500 if feature has children)
-- Tasks: GET/PUT `/tasks/{id}`, `/tasks/{id}/notes` - GET/POST notes
+- Tasks: GET/PUT `/tasks/{id}`
 
 ### Database
 
