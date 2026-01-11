@@ -34,6 +34,220 @@ impl McpServer {
         Uuid::parse_str(s)
             .map_err(|e| McpError::invalid_params(format!("Invalid UUID: {}", e), None))
     }
+
+    // ============================================================
+    // Test helpers - expose tool logic for testing
+    // ============================================================
+
+    pub async fn test_get_task_context(
+        &self,
+        task_id: &str,
+    ) -> Result<TaskContextResponse, McpError> {
+        let task_id = Self::parse_uuid(task_id)?;
+
+        let task = self
+            .db
+            .get_task(task_id)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?
+            .ok_or_else(|| McpError::invalid_params("Task not found", None))?;
+
+        let session = self
+            .db
+            .get_session(task.session_id)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?
+            .ok_or_else(|| McpError::internal_error("Session not found", None))?;
+
+        let feature = self
+            .db
+            .get_feature(session.feature_id)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?
+            .ok_or_else(|| McpError::internal_error("Feature not found", None))?;
+
+        Ok(TaskContextResponse {
+            task: TaskInfo {
+                id: task.id.to_string(),
+                title: task.title,
+                scope: task.scope,
+                status: task.status.as_str().to_string(),
+                agent_type: task.agent_type.as_str().to_string(),
+            },
+            feature: FeatureInfo {
+                id: feature.id.to_string(),
+                title: feature.title,
+                story: feature.story,
+                details: feature.details,
+                state: feature.state.as_str().to_string(),
+            },
+            session_goal: session.goal,
+        })
+    }
+
+    pub fn test_start_task(&self, task_id: &str) -> Result<(), McpError> {
+        let task_id = Self::parse_uuid(task_id)?;
+        let updated = self
+            .db
+            .update_task(
+                task_id,
+                UpdateTaskInput {
+                    status: Some(TaskStatus::Running),
+                    worktree_path: None,
+                    branch: None,
+                },
+            )
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        if !updated {
+            return Err(McpError::invalid_params("Task not found", None));
+        }
+        Ok(())
+    }
+
+    pub fn test_complete_task(&self, task_id: &str) -> Result<(), McpError> {
+        let task_id = Self::parse_uuid(task_id)?;
+        let updated = self
+            .db
+            .update_task(
+                task_id,
+                UpdateTaskInput {
+                    status: Some(TaskStatus::Completed),
+                    worktree_path: None,
+                    branch: None,
+                },
+            )
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        if !updated {
+            return Err(McpError::invalid_params("Task not found", None));
+        }
+        Ok(())
+    }
+
+    pub fn test_create_session(
+        &self,
+        feature_id: &str,
+        goal: &str,
+    ) -> Result<SessionInfo, McpError> {
+        let feature_id = Self::parse_uuid(feature_id)?;
+        let response = self
+            .db
+            .create_session(CreateSessionInput {
+                feature_id,
+                goal: goal.to_string(),
+                tasks: vec![],
+            })
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(SessionInfo {
+            id: response.session.id.to_string(),
+            feature_id: response.session.feature_id.to_string(),
+            goal: response.session.goal,
+            status: response.session.status.as_str().to_string(),
+        })
+    }
+
+    pub fn test_create_task(
+        &self,
+        session_id: &str,
+        title: &str,
+        scope: &str,
+        agent_type: &str,
+    ) -> Result<TaskInfo, McpError> {
+        let session_id = Self::parse_uuid(session_id)?;
+        let agent_type = AgentType::from_str(agent_type).map_err(|_| {
+            McpError::invalid_params(
+                format!(
+                    "Invalid agent_type '{}'. Must be: claude, gemini, or codex",
+                    agent_type
+                ),
+                None,
+            )
+        })?;
+
+        let task = self
+            .db
+            .create_task(
+                session_id,
+                CreateTaskInput {
+                    parent_id: None,
+                    title: title.to_string(),
+                    scope: scope.to_string(),
+                    agent_type,
+                },
+            )
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(TaskInfo {
+            id: task.id.to_string(),
+            title: task.title,
+            scope: task.scope,
+            status: task.status.as_str().to_string(),
+            agent_type: task.agent_type.as_str().to_string(),
+        })
+    }
+
+    pub fn test_list_session_tasks(&self, session_id: &str) -> Result<TaskListResponse, McpError> {
+        let session_id = Self::parse_uuid(session_id)?;
+        let tasks = self
+            .db
+            .get_tasks_by_session(session_id)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(TaskListResponse {
+            session_id: session_id.to_string(),
+            tasks: tasks
+                .into_iter()
+                .map(|t| TaskInfo {
+                    id: t.id.to_string(),
+                    title: t.title,
+                    scope: t.scope,
+                    status: t.status.as_str().to_string(),
+                    agent_type: t.agent_type.as_str().to_string(),
+                })
+                .collect(),
+        })
+    }
+
+    pub fn test_complete_session(
+        &self,
+        session_id: &str,
+        summary: &str,
+        files_changed: Vec<String>,
+        mark_implemented: bool,
+    ) -> Result<CompleteSessionResponse, McpError> {
+        let session_id = Self::parse_uuid(session_id)?;
+        let feature_state = if mark_implemented {
+            Some(FeatureState::Implemented)
+        } else {
+            None
+        };
+
+        let result = self
+            .db
+            .complete_session(
+                session_id,
+                CompleteSessionInput {
+                    summary: summary.to_string(),
+                    author: "session".to_string(),
+                    files_changed,
+                    commits: vec![],
+                    feature_state,
+                },
+            )
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?
+            .ok_or_else(|| McpError::invalid_params("Session not found", None))?;
+
+        Ok(CompleteSessionResponse {
+            session_id: result.session.id.to_string(),
+            feature_id: result.session.feature_id.to_string(),
+            feature_state: if mark_implemented {
+                "implemented"
+            } else {
+                "unchanged"
+            }
+            .to_string(),
+            history_entry_id: result.history_entry.id.to_string(),
+        })
+    }
 }
 
 #[tool_router]

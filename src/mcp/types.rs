@@ -100,7 +100,7 @@ fn default_true() -> bool {
 // Response Types
 // ============================================================
 
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct TaskContextResponse {
     /// The task you are assigned to complete
     pub task: TaskInfo,
@@ -110,7 +110,7 @@ pub struct TaskContextResponse {
     pub session_goal: String,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct TaskInfo {
     pub id: String,
     pub title: String,
@@ -119,7 +119,7 @@ pub struct TaskInfo {
     pub agent_type: String,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct FeatureInfo {
     pub id: String,
     pub title: String,
@@ -128,7 +128,7 @@ pub struct FeatureInfo {
     pub state: String,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct SessionInfo {
     pub id: String,
     pub feature_id: String,
@@ -136,13 +136,13 @@ pub struct SessionInfo {
     pub status: String,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct TaskListResponse {
     pub session_id: String,
     pub tasks: Vec<TaskInfo>,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct CompleteSessionResponse {
     pub session_id: String,
     pub feature_id: String,
