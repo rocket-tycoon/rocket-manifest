@@ -453,3 +453,254 @@ mod orchestrator_tools {
         }
     }
 }
+
+// ============================================================
+// Discovery Tools Tests
+// ============================================================
+
+mod discovery_tools {
+    use super::*;
+
+    mod list_features {
+        use super::*;
+
+        #[tokio::test]
+        async fn returns_all_features_when_no_filter() {
+            let (server, db) = setup();
+            let project = create_test_project(&db);
+            create_test_feature(&db, project.id);
+
+            db.create_feature(
+                project.id,
+                CreateFeatureInput {
+                    parent_id: None,
+                    title: "Second Feature".to_string(),
+                    story: None,
+                    details: None,
+                    state: Some(FeatureState::Proposed),
+                },
+            )
+            .expect("Failed to create feature");
+
+            let response = server.test_list_features(None, None).expect("Tool failed");
+
+            assert_eq!(response.features.len(), 2);
+        }
+
+        #[tokio::test]
+        async fn filters_by_project() {
+            let (server, db) = setup();
+            let project1 = create_test_project(&db);
+            let project2 = db
+                .create_project(CreateProjectInput {
+                    name: "Other Project".to_string(),
+                    description: None,
+                    instructions: None,
+                })
+                .expect("Failed to create project");
+
+            create_test_feature(&db, project1.id);
+            db.create_feature(
+                project2.id,
+                CreateFeatureInput {
+                    parent_id: None,
+                    title: "Other Feature".to_string(),
+                    story: None,
+                    details: None,
+                    state: None,
+                },
+            )
+            .expect("Failed to create feature");
+
+            let response = server
+                .test_list_features(Some(&project1.id.to_string()), None)
+                .expect("Tool failed");
+
+            assert_eq!(response.features.len(), 1);
+            assert_eq!(response.features[0].title, "Test Feature");
+        }
+
+        #[tokio::test]
+        async fn filters_by_state() {
+            let (server, db) = setup();
+            let project = create_test_project(&db);
+            create_test_feature(&db, project.id); // state = Specified
+
+            db.create_feature(
+                project.id,
+                CreateFeatureInput {
+                    parent_id: None,
+                    title: "Proposed Feature".to_string(),
+                    story: None,
+                    details: None,
+                    state: Some(FeatureState::Proposed),
+                },
+            )
+            .expect("Failed to create feature");
+
+            let response = server
+                .test_list_features(None, Some("specified"))
+                .expect("Tool failed");
+
+            assert_eq!(response.features.len(), 1);
+            assert_eq!(response.features[0].state, "specified");
+        }
+
+        #[tokio::test]
+        async fn returns_error_for_invalid_state() {
+            let (server, _db) = setup();
+
+            let result = server.test_list_features(None, Some("invalid"));
+
+            assert!(result.is_err());
+        }
+    }
+
+    mod get_feature {
+        use super::*;
+
+        #[tokio::test]
+        async fn returns_feature_details() {
+            let (server, db) = setup();
+            let project = create_test_project(&db);
+            let feature = create_test_feature(&db, project.id);
+
+            let response = server
+                .test_get_feature(&feature.id.to_string())
+                .expect("Tool failed");
+
+            assert_eq!(response.id, feature.id.to_string());
+            assert_eq!(response.title, "Test Feature");
+            assert_eq!(
+                response.story,
+                Some("As a user, I want to test".to_string())
+            );
+        }
+
+        #[tokio::test]
+        async fn returns_error_for_nonexistent_feature() {
+            let (server, _db) = setup();
+
+            let result = server.test_get_feature(&uuid::Uuid::new_v4().to_string());
+
+            assert!(result.is_err());
+        }
+    }
+
+    mod get_project_context {
+        use super::*;
+
+        #[tokio::test]
+        async fn returns_project_for_exact_directory_match() {
+            let (server, db) = setup();
+            let project = db
+                .create_project(CreateProjectInput {
+                    name: "My Project".to_string(),
+                    description: Some("A test project".to_string()),
+                    instructions: Some("Follow coding-guidelines.md".to_string()),
+                })
+                .expect("Failed to create project");
+
+            db.add_project_directory(
+                project.id,
+                AddDirectoryInput {
+                    path: "/Users/dev/my-project".to_string(),
+                    git_remote: Some("git@github.com:org/repo.git".to_string()),
+                    is_primary: true,
+                    instructions: Some("Run tests with cargo test".to_string()),
+                },
+            )
+            .expect("Failed to add directory");
+
+            let response = server
+                .test_get_project_context("/Users/dev/my-project")
+                .expect("Tool failed");
+
+            assert_eq!(response.project.name, "My Project");
+            assert_eq!(
+                response.project.instructions,
+                Some("Follow coding-guidelines.md".to_string())
+            );
+            assert_eq!(response.directory.path, "/Users/dev/my-project");
+            assert!(response.directory.is_primary);
+            assert_eq!(
+                response.directory.instructions,
+                Some("Run tests with cargo test".to_string())
+            );
+        }
+
+        #[tokio::test]
+        async fn returns_project_for_subdirectory() {
+            let (server, db) = setup();
+            let project = create_test_project(&db);
+
+            db.add_project_directory(
+                project.id,
+                AddDirectoryInput {
+                    path: "/Users/dev/project".to_string(),
+                    git_remote: None,
+                    is_primary: true,
+                    instructions: None,
+                },
+            )
+            .expect("Failed to add directory");
+
+            let response = server
+                .test_get_project_context("/Users/dev/project/src/components")
+                .expect("Tool failed");
+
+            assert_eq!(response.project.name, "Test Project");
+        }
+
+        #[tokio::test]
+        async fn returns_error_for_unknown_directory() {
+            let (server, _db) = setup();
+
+            let result = server.test_get_project_context("/unknown/path");
+
+            assert!(result.is_err());
+        }
+    }
+
+    mod update_feature_state {
+        use super::*;
+
+        #[tokio::test]
+        async fn updates_feature_state() {
+            let (server, db) = setup();
+            let project = create_test_project(&db);
+            let feature = create_test_feature(&db, project.id); // state = Specified
+
+            let response = server
+                .test_update_feature_state(&feature.id.to_string(), "implemented")
+                .expect("Tool failed");
+
+            assert_eq!(response.state, "implemented");
+
+            // Verify in database
+            let feature = db.get_feature(feature.id).expect("Query failed").unwrap();
+            assert_eq!(feature.state, FeatureState::Implemented);
+        }
+
+        #[tokio::test]
+        async fn returns_error_for_invalid_state() {
+            let (server, db) = setup();
+            let project = create_test_project(&db);
+            let feature = create_test_feature(&db, project.id);
+
+            let result = server.test_update_feature_state(&feature.id.to_string(), "invalid");
+
+            assert!(result.is_err());
+        }
+
+        #[tokio::test]
+        async fn returns_error_for_nonexistent_feature() {
+            let (server, _db) = setup();
+
+            let result =
+                server.test_update_feature_state(&uuid::Uuid::new_v4().to_string(), "implemented");
+
+            assert!(result.is_err());
+        }
+    }
+}

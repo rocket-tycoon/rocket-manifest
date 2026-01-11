@@ -250,6 +250,40 @@ impl Database {
         }))
     }
 
+    /// Find a project by a directory path.
+    ///
+    /// Returns the project and matching directory if the path matches exactly,
+    /// or if the path is a subdirectory of a registered project directory.
+    pub fn get_project_by_directory(&self, path: &str) -> Result<Option<ProjectWithDirectories>> {
+        let conn = self.conn.lock().expect("database lock poisoned");
+
+        // Get all directories ordered by path length (longest first for best match)
+        let mut stmt = conn.prepare(
+            "SELECT project_id, path FROM project_directories ORDER BY length(path) DESC",
+        )?;
+
+        let mut rows = stmt.query([])?;
+        let mut found_project_id = None;
+
+        while let Some(row) = rows.next()? {
+            let dir_path: String = row.get(1)?;
+            // Check exact match or subdirectory match
+            if path == dir_path || path.starts_with(&format!("{}/", dir_path)) {
+                found_project_id = Some(row.get::<_, String>(0)?);
+                break;
+            }
+        }
+
+        drop(rows);
+        drop(stmt);
+        drop(conn);
+
+        match found_project_id {
+            Some(id) => self.get_project_with_directories(parse_uuid(id)),
+            None => Ok(None),
+        }
+    }
+
     // ============================================================
     // Feature operations
     // ============================================================

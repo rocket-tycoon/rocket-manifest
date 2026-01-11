@@ -248,6 +248,141 @@ impl McpServer {
             history_entry_id: result.history_entry.id.to_string(),
         })
     }
+
+    pub fn test_list_features(
+        &self,
+        project_id: Option<&str>,
+        state: Option<&str>,
+    ) -> Result<FeatureListResponse, McpError> {
+        let features = match project_id {
+            Some(pid) => {
+                let project_id = Self::parse_uuid(pid)?;
+                self.db
+                    .get_features_by_project(project_id)
+                    .map_err(|e| McpError::internal_error(e.to_string(), None))?
+            }
+            None => self
+                .db
+                .get_all_features()
+                .map_err(|e| McpError::internal_error(e.to_string(), None))?,
+        };
+
+        let features: Vec<_> = match state {
+            Some(state) => {
+                let target_state = FeatureState::from_str(state).map_err(|_| {
+                    McpError::invalid_params(format!("Invalid state '{}'", state), None)
+                })?;
+                features
+                    .into_iter()
+                    .filter(|f| f.state == target_state)
+                    .collect()
+            }
+            None => features,
+        };
+
+        Ok(FeatureListResponse {
+            features: features
+                .into_iter()
+                .map(|f| FeatureInfo {
+                    id: f.id.to_string(),
+                    title: f.title,
+                    story: f.story,
+                    details: f.details,
+                    state: f.state.as_str().to_string(),
+                })
+                .collect(),
+        })
+    }
+
+    pub fn test_get_feature(&self, feature_id: &str) -> Result<FeatureInfo, McpError> {
+        let feature_id = Self::parse_uuid(feature_id)?;
+        let feature = self
+            .db
+            .get_feature(feature_id)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?
+            .ok_or_else(|| McpError::invalid_params("Feature not found", None))?;
+
+        Ok(FeatureInfo {
+            id: feature.id.to_string(),
+            title: feature.title,
+            story: feature.story,
+            details: feature.details,
+            state: feature.state.as_str().to_string(),
+        })
+    }
+
+    pub fn test_get_project_context(
+        &self,
+        directory_path: &str,
+    ) -> Result<ProjectContextResponse, McpError> {
+        let project_with_dirs = self
+            .db
+            .get_project_by_directory(directory_path)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?
+            .ok_or_else(|| {
+                McpError::invalid_params(
+                    format!("No project found for directory: {}", directory_path),
+                    None,
+                )
+            })?;
+
+        let matching_dir = project_with_dirs
+            .directories
+            .iter()
+            .find(|d| {
+                directory_path == d.path || directory_path.starts_with(&format!("{}/", d.path))
+            })
+            .ok_or_else(|| McpError::internal_error("Directory match logic error", None))?;
+
+        Ok(ProjectContextResponse {
+            project: ProjectInfo {
+                id: project_with_dirs.project.id.to_string(),
+                name: project_with_dirs.project.name,
+                description: project_with_dirs.project.description,
+                instructions: project_with_dirs.project.instructions,
+            },
+            directory: DirectoryInfo {
+                id: matching_dir.id.to_string(),
+                path: matching_dir.path.clone(),
+                git_remote: matching_dir.git_remote.clone(),
+                is_primary: matching_dir.is_primary,
+                instructions: matching_dir.instructions.clone(),
+            },
+        })
+    }
+
+    pub fn test_update_feature_state(
+        &self,
+        feature_id: &str,
+        state: &str,
+    ) -> Result<FeatureInfo, McpError> {
+        let feature_id = Self::parse_uuid(feature_id)?;
+        let new_state = FeatureState::from_str(state)
+            .map_err(|_| McpError::invalid_params(format!("Invalid state '{}'", state), None))?;
+
+        let feature = self
+            .db
+            .update_feature(
+                feature_id,
+                UpdateFeatureInput {
+                    parent_id: None,
+                    title: None,
+                    story: None,
+                    details: None,
+                    state: Some(new_state),
+                },
+            )
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?
+            .ok_or_else(|| McpError::invalid_params("Feature not found", None))?;
+
+        Ok(FeatureInfo {
+            id: feature.id.to_string(),
+            title: feature.title,
+            story: feature.story,
+            details: feature.details,
+            state: feature.state.as_str().to_string(),
+        })
+    }
 }
 
 #[tool_router]
@@ -548,6 +683,203 @@ impl McpServer {
 
         Ok(CallToolResult::success(vec![Content::text(json)]))
     }
+
+    // ============================================================
+    // Discovery Tools - Browse features and projects
+    // ============================================================
+
+    #[tool(
+        description = "List features, optionally filtered by project or state. Use this to discover what features exist and their current state. Returns features ordered by title. Filter by state to find features ready for work (e.g., state='specified')."
+    )]
+    async fn list_features(
+        &self,
+        params: Parameters<ListFeaturesRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let req = params.0;
+
+        // Get features (filtered by project if specified)
+        let features = match req.project_id {
+            Some(ref pid) => {
+                let project_id = Self::parse_uuid(pid)?;
+                self.db
+                    .get_features_by_project(project_id)
+                    .map_err(|e| McpError::internal_error(e.to_string(), None))?
+            }
+            None => self
+                .db
+                .get_all_features()
+                .map_err(|e| McpError::internal_error(e.to_string(), None))?,
+        };
+
+        // Filter by state if specified
+        let features: Vec<_> = match req.state {
+            Some(ref state) => {
+                let target_state = FeatureState::from_str(state).map_err(|_| {
+                    McpError::invalid_params(
+                        format!(
+                            "Invalid state '{}'. Must be: proposed, specified, implemented, or deprecated",
+                            state
+                        ),
+                        None,
+                    )
+                })?;
+                features
+                    .into_iter()
+                    .filter(|f| f.state == target_state)
+                    .collect()
+            }
+            None => features,
+        };
+
+        let result = FeatureListResponse {
+            features: features
+                .into_iter()
+                .map(|f| FeatureInfo {
+                    id: f.id.to_string(),
+                    title: f.title,
+                    story: f.story,
+                    details: f.details,
+                    state: f.state.as_str().to_string(),
+                })
+                .collect(),
+        };
+
+        let json = serde_json::to_string_pretty(&result)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(CallToolResult::success(vec![Content::text(json)]))
+    }
+
+    #[tool(
+        description = "Get detailed information about a specific feature by ID. Returns the feature's title, story, implementation details, and current state. Use this before creating a session to understand what needs to be built."
+    )]
+    async fn get_feature(
+        &self,
+        params: Parameters<GetFeatureRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let req = params.0;
+        let feature_id = Self::parse_uuid(&req.feature_id)?;
+
+        let feature = self
+            .db
+            .get_feature(feature_id)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?
+            .ok_or_else(|| McpError::invalid_params("Feature not found", None))?;
+
+        let result = FeatureInfo {
+            id: feature.id.to_string(),
+            title: feature.title,
+            story: feature.story,
+            details: feature.details,
+            state: feature.state.as_str().to_string(),
+        };
+
+        let json = serde_json::to_string_pretty(&result)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(CallToolResult::success(vec![Content::text(json)]))
+    }
+
+    #[tool(
+        description = "Get project context for a directory path. Given a directory (e.g., your current working directory), returns the associated project with its instructions and coding guidelines. Use this to understand project conventions before starting work."
+    )]
+    async fn get_project_context(
+        &self,
+        params: Parameters<GetProjectContextRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let req = params.0;
+
+        let project_with_dirs = self
+            .db
+            .get_project_by_directory(&req.directory_path)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?
+            .ok_or_else(|| {
+                McpError::invalid_params(
+                    format!("No project found for directory: {}", req.directory_path),
+                    None,
+                )
+            })?;
+
+        // Find the matching directory
+        let matching_dir = project_with_dirs
+            .directories
+            .iter()
+            .find(|d| {
+                req.directory_path == d.path
+                    || req.directory_path.starts_with(&format!("{}/", d.path))
+            })
+            .ok_or_else(|| McpError::internal_error("Directory match logic error", None))?;
+
+        let result = ProjectContextResponse {
+            project: ProjectInfo {
+                id: project_with_dirs.project.id.to_string(),
+                name: project_with_dirs.project.name,
+                description: project_with_dirs.project.description,
+                instructions: project_with_dirs.project.instructions,
+            },
+            directory: DirectoryInfo {
+                id: matching_dir.id.to_string(),
+                path: matching_dir.path.clone(),
+                git_remote: matching_dir.git_remote.clone(),
+                is_primary: matching_dir.is_primary,
+                instructions: matching_dir.instructions.clone(),
+            },
+        };
+
+        let json = serde_json::to_string_pretty(&result)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(CallToolResult::success(vec![Content::text(json)]))
+    }
+
+    #[tool(
+        description = "Update a feature's state. Use this to transition features through their lifecycle: proposed → specified → implemented → deprecated. Typically called by orchestrators after completing work or during planning."
+    )]
+    async fn update_feature_state(
+        &self,
+        params: Parameters<UpdateFeatureStateRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let req = params.0;
+        let feature_id = Self::parse_uuid(&req.feature_id)?;
+
+        let new_state = FeatureState::from_str(&req.state).map_err(|_| {
+            McpError::invalid_params(
+                format!(
+                    "Invalid state '{}'. Must be: proposed, specified, implemented, or deprecated",
+                    req.state
+                ),
+                None,
+            )
+        })?;
+
+        let feature = self
+            .db
+            .update_feature(
+                feature_id,
+                UpdateFeatureInput {
+                    parent_id: None,
+                    title: None,
+                    story: None,
+                    details: None,
+                    state: Some(new_state),
+                },
+            )
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?
+            .ok_or_else(|| McpError::invalid_params("Feature not found", None))?;
+
+        let result = FeatureInfo {
+            id: feature.id.to_string(),
+            title: feature.title,
+            story: feature.story,
+            details: feature.details,
+            state: feature.state.as_str().to_string(),
+        };
+
+        let json = serde_json::to_string_pretty(&result)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(CallToolResult::success(vec![Content::text(json)]))
+    }
 }
 
 #[tool_handler]
@@ -557,6 +889,11 @@ impl ServerHandler for McpServer {
             instructions: Some(
                 r#"RocketManifest manages feature implementation sessions and tasks.
 
+DISCOVERY (find what to work on):
+- get_project_context: Given your CWD, find the project and its instructions
+- list_features: Browse features, filter by project_id or state (proposed/specified/implemented/deprecated)
+- get_feature: Get full details of a feature before starting work
+
 AGENT WORKFLOW (when assigned a task_id):
 1. Call get_task_context with your task_id to understand your assignment
 2. Call start_task to signal you're beginning work
@@ -564,14 +901,17 @@ AGENT WORKFLOW (when assigned a task_id):
 4. Call complete_task when done and verified
 
 ORCHESTRATOR WORKFLOW (when managing a feature):
-1. Call create_session on a leaf feature to start work
-2. Call create_task to break down work into agent-sized units
-3. Spawn agents with their task_ids
-4. Call list_session_tasks to monitor progress
-5. Call complete_session when all tasks are done (marks feature as 'implemented' by default)
+1. Call list_features with state='specified' to find work
+2. Call get_feature to read the full specification
+3. Call create_session on a leaf feature to start work
+4. Call create_task to break down work into agent-sized units
+5. Spawn agents with their task_ids
+6. Call list_session_tasks to monitor progress
+7. Call complete_session when all tasks are done
+8. Call update_feature_state if needed (e.g., to 'deprecated')
 
 IMPORTANT:
-- Read feature details carefully before coding
+- Read feature story and details carefully before coding
 - Only call complete_task when work is verified (tests pass, code compiles)
 - Tasks should be small enough for one agent (1-3 story points)"#
                     .into(),
