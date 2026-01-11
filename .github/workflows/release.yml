@@ -36,17 +36,17 @@ jobs:
       - name: Package
         run: |
           mkdir -p dist
-          cp target/${{ matrix.target }}/release/rocket-manifest dist/
+          cp target/${{ matrix.target }}/release/rmf dist/
           cp README.md dist/
           cp LICENSE dist/ 2>/dev/null || true
           cd dist
-          tar -czvf ../rocket-manifest-${{ github.ref_name }}-${{ matrix.target }}.tar.gz *
+          tar -czvf ../rmf-${{ github.ref_name }}-${{ matrix.target }}.tar.gz *
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: rocket-manifest-${{ matrix.target }}
-          path: rocket-manifest-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
+          name: rmf-${{ matrix.target }}
+          path: rmf-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
 
   release:
     name: Create Release
@@ -92,44 +92,46 @@ jobs:
           VERSION="${{ github.ref_name }}"
 
           # Calculate SHA256 for each platform
-          SHA_ARM=$(sha256sum artifacts/rocket-manifest-aarch64-apple-darwin/rocket-manifest-${VERSION}-aarch64-apple-darwin.tar.gz | cut -d' ' -f1)
-          SHA_INTEL=$(sha256sum artifacts/rocket-manifest-x86_64-apple-darwin/rocket-manifest-${VERSION}-x86_64-apple-darwin.tar.gz | cut -d' ' -f1)
-          SHA_LINUX=$(sha256sum artifacts/rocket-manifest-x86_64-unknown-linux-gnu/rocket-manifest-${VERSION}-x86_64-unknown-linux-gnu.tar.gz | cut -d' ' -f1)
+          SHA_ARM=$(sha256sum artifacts/rmf-aarch64-apple-darwin/rmf-${VERSION}-aarch64-apple-darwin.tar.gz | cut -d' ' -f1)
+          SHA_INTEL=$(sha256sum artifacts/rmf-x86_64-apple-darwin/rmf-${VERSION}-x86_64-apple-darwin.tar.gz | cut -d' ' -f1)
+          SHA_LINUX=$(sha256sum artifacts/rmf-x86_64-unknown-linux-gnu/rmf-${VERSION}-x86_64-unknown-linux-gnu.tar.gz | cut -d' ' -f1)
 
           echo "SHA256 (ARM):   $SHA_ARM"
           echo "SHA256 (Intel): $SHA_INTEL"
           echo "SHA256 (Linux): $SHA_LINUX"
 
           # Update formula
-          cat > homebrew-tap/Formula/rocket-manifest.rb << EOF
+          cat > homebrew-tap/Formula/rocket-manifest.rb << 'FORMULA'
           class RocketManifest < Formula
             desc "MCP server for living feature documentation"
             homepage "https://github.com/rocket-tycoon/rocket-manifest"
-            license "MIT"
-            version "${VERSION#v}"
+            license "BUSL-1.1"
+          FORMULA
+          echo "  version \"${VERSION#v}\"" >> homebrew-tap/Formula/rocket-manifest.rb
+          cat >> homebrew-tap/Formula/rocket-manifest.rb << FORMULA
 
             on_macos do
               on_arm do
-                url "https://github.com/rocket-tycoon/rocket-manifest/releases/download/${VERSION}/rocket-manifest-${VERSION}-aarch64-apple-darwin.tar.gz"
+                url "https://github.com/rocket-tycoon/rocket-manifest/releases/download/${VERSION}/rmf-${VERSION}-aarch64-apple-darwin.tar.gz"
                 sha256 "${SHA_ARM}"
               end
               on_intel do
-                url "https://github.com/rocket-tycoon/rocket-manifest/releases/download/${VERSION}/rocket-manifest-${VERSION}-x86_64-apple-darwin.tar.gz"
+                url "https://github.com/rocket-tycoon/rocket-manifest/releases/download/${VERSION}/rmf-${VERSION}-x86_64-apple-darwin.tar.gz"
                 sha256 "${SHA_INTEL}"
               end
             end
 
             on_linux do
-              url "https://github.com/rocket-tycoon/rocket-manifest/releases/download/${VERSION}/rocket-manifest-${VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+              url "https://github.com/rocket-tycoon/rocket-manifest/releases/download/${VERSION}/rmf-${VERSION}-x86_64-unknown-linux-gnu.tar.gz"
               sha256 "${SHA_LINUX}"
             end
 
             def install
-              bin.install "rocket-manifest"
+              bin.install "rmf"
             end
 
             service do
-              run [opt_bin/"rocket-manifest", "serve"]
+              run [opt_bin/"rmf", "serve"]
               keep_alive true
               working_dir var/"rocket-manifest"
               log_path var/"log/rocket-manifest.log"
@@ -142,10 +144,10 @@ jobs:
             end
 
             test do
-              system "#{bin}/rocket-manifest", "--version"
+              system "#{bin}/rmf", "--help"
             end
           end
-          EOF
+          FORMULA
 
       - name: Commit and push
         run: |
