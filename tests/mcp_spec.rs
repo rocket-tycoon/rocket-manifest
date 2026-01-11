@@ -5,7 +5,7 @@
 //! - Orchestrator tools: Used to manage sessions and tasks
 
 use rocket_manifest::db::Database;
-use rocket_manifest::mcp::McpServer;
+use rocket_manifest::mcp::{McpServer, ProposedFeature};
 use rocket_manifest::models::*;
 
 /// Helper to create a test MCP server with in-memory database.
@@ -1009,6 +1009,189 @@ mod setup_tools {
 
             assert_eq!(session.feature_id, feature.id);
             assert_eq!(session.status, "active");
+        }
+    }
+
+    mod plan_features {
+        use super::*;
+
+        #[tokio::test]
+        async fn returns_proposal_without_creating_when_confirm_is_false() {
+            let (server, db) = setup();
+            let project = create_test_project(&db);
+
+            let features = vec![ProposedFeature {
+                title: "User Authentication".to_string(),
+                story: Some("As a user, I can log in".to_string()),
+                details: None,
+                priority: 0,
+                children: vec![],
+            }];
+
+            let response = server
+                .test_plan_features(&project.id.to_string(), features, false)
+                .expect("Tool failed");
+
+            assert!(!response.created);
+            assert!(response.created_feature_ids.is_empty());
+            assert_eq!(response.proposed_features.len(), 1);
+            assert_eq!(response.proposed_features[0].title, "User Authentication");
+
+            // Verify nothing was created in the database
+            let db_features = db
+                .get_features_by_project(project.id)
+                .expect("Query failed");
+            assert!(db_features.is_empty());
+        }
+
+        #[tokio::test]
+        async fn creates_features_when_confirm_is_true() {
+            let (server, db) = setup();
+            let project = create_test_project(&db);
+
+            let features = vec![ProposedFeature {
+                title: "Todo Management".to_string(),
+                story: Some("As a user, I can manage my todos".to_string()),
+                details: Some("CRUD operations for todos".to_string()),
+                priority: 0,
+                children: vec![],
+            }];
+
+            let response = server
+                .test_plan_features(&project.id.to_string(), features, true)
+                .expect("Tool failed");
+
+            assert!(response.created);
+            assert_eq!(response.created_feature_ids.len(), 1);
+
+            // Verify feature was created in the database
+            let feature_id =
+                uuid::Uuid::parse_str(&response.created_feature_ids[0]).expect("Invalid UUID");
+            let feature = db.get_feature(feature_id).expect("Query failed").unwrap();
+            assert_eq!(feature.title, "Todo Management");
+            assert_eq!(
+                feature.story,
+                Some("As a user, I can manage my todos".to_string())
+            );
+            assert_eq!(feature.state, FeatureState::Specified);
+        }
+
+        #[tokio::test]
+        async fn creates_nested_feature_tree() {
+            let (server, db) = setup();
+            let project = create_test_project(&db);
+
+            let features = vec![ProposedFeature {
+                title: "Authentication".to_string(),
+                story: None,
+                details: None,
+                priority: 0,
+                children: vec![
+                    ProposedFeature {
+                        title: "Password Login".to_string(),
+                        story: Some("As a user, I can log in with password".to_string()),
+                        details: None,
+                        priority: 0,
+                        children: vec![],
+                    },
+                    ProposedFeature {
+                        title: "OAuth".to_string(),
+                        story: Some("As a user, I can log in with OAuth".to_string()),
+                        details: None,
+                        priority: 1,
+                        children: vec![],
+                    },
+                ],
+            }];
+
+            let response = server
+                .test_plan_features(&project.id.to_string(), features, true)
+                .expect("Tool failed");
+
+            assert!(response.created);
+            assert_eq!(response.created_feature_ids.len(), 3);
+
+            // Verify parent-child relationships
+            let parent_id =
+                uuid::Uuid::parse_str(&response.created_feature_ids[0]).expect("Invalid UUID");
+            let children = db.get_children(parent_id).expect("Query failed");
+            assert_eq!(children.len(), 2);
+            assert_eq!(children[0].title, "Password Login");
+            assert_eq!(children[1].title, "OAuth");
+        }
+
+        #[tokio::test]
+        async fn creates_multiple_root_features() {
+            let (server, db) = setup();
+            let project = create_test_project(&db);
+
+            let features = vec![
+                ProposedFeature {
+                    title: "Authentication".to_string(),
+                    story: None,
+                    details: None,
+                    priority: 0,
+                    children: vec![],
+                },
+                ProposedFeature {
+                    title: "Todo Management".to_string(),
+                    story: None,
+                    details: None,
+                    priority: 1,
+                    children: vec![],
+                },
+            ];
+
+            let response = server
+                .test_plan_features(&project.id.to_string(), features, true)
+                .expect("Tool failed");
+
+            assert_eq!(response.created_feature_ids.len(), 2);
+
+            // Verify both are root features
+            let roots = db.get_root_features(project.id).expect("Query failed");
+            assert_eq!(roots.len(), 2);
+        }
+
+        #[tokio::test]
+        async fn returns_error_for_nonexistent_project() {
+            let (server, _db) = setup();
+
+            let features = vec![ProposedFeature {
+                title: "Feature".to_string(),
+                story: None,
+                details: None,
+                priority: 0,
+                children: vec![],
+            }];
+
+            let result =
+                server.test_plan_features(&uuid::Uuid::new_v4().to_string(), features, true);
+
+            assert!(result.is_err());
+        }
+
+        #[tokio::test]
+        async fn sets_priority_from_proposed_features() {
+            let (server, db) = setup();
+            let project = create_test_project(&db);
+
+            let features = vec![ProposedFeature {
+                title: "Feature".to_string(),
+                story: None,
+                details: None,
+                priority: 42,
+                children: vec![],
+            }];
+
+            let response = server
+                .test_plan_features(&project.id.to_string(), features, true)
+                .expect("Tool failed");
+
+            let feature_id =
+                uuid::Uuid::parse_str(&response.created_feature_ids[0]).expect("Invalid UUID");
+            let feature = db.get_feature(feature_id).expect("Query failed").unwrap();
+            assert_eq!(feature.priority, 42);
         }
     }
 }

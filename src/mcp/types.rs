@@ -196,6 +196,21 @@ fn default_proposed() -> String {
     "proposed".to_string()
 }
 
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct PlanFeaturesRequest {
+    #[schemars(description = "The UUID of the project to plan features for")]
+    pub project_id: String,
+    #[schemars(
+        description = "The proposed feature tree. Apply the user story test before proposing: 'As a [user], I can [feature]...'"
+    )]
+    pub features: Vec<ProposedFeature>,
+    #[schemars(
+        description = "If true, creates the features in the database. If false (default), returns proposal for user review."
+    )]
+    #[serde(default)]
+    pub confirm: bool,
+}
+
 // ============================================================
 // Response Types
 // ============================================================
@@ -280,4 +295,33 @@ pub struct DirectoryInfo {
     pub is_primary: bool,
     /// Directory-specific instructions (build commands, test commands).
     pub instructions: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct PlanFeaturesResponse {
+    /// The proposed feature tree. Review before confirming.
+    pub proposed_features: Vec<ProposedFeature>,
+    /// Whether the features were created (true if confirm=true was passed)
+    pub created: bool,
+    /// IDs of created features (only populated if created=true)
+    #[serde(default)]
+    pub created_feature_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ProposedFeature {
+    /// Short capability name (2-5 words). What users can DO.
+    pub title: String,
+    /// User story: "As a [user], I can [capability] so that [benefit]"
+    #[serde(default)]
+    pub story: Option<String>,
+    /// Technical notes, constraints, acceptance criteria
+    #[serde(default)]
+    pub details: Option<String>,
+    /// Priority for ordering. Lower values = implement first.
+    #[serde(default)]
+    pub priority: i32,
+    /// Child features (for hierarchical structure)
+    #[serde(default)]
+    pub children: Vec<ProposedFeature>,
 }

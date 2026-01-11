@@ -485,6 +485,35 @@ impl McpServer {
             priority: feature.priority,
         })
     }
+
+    pub fn test_plan_features(
+        &self,
+        project_id: &str,
+        features: Vec<ProposedFeature>,
+        confirm: bool,
+    ) -> Result<PlanFeaturesResponse, McpError> {
+        let project_id_uuid = Self::parse_uuid(project_id)?;
+
+        // Verify project exists
+        self.db
+            .get_project(project_id_uuid)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?
+            .ok_or_else(|| McpError::invalid_params("Project not found", None))?;
+
+        let mut created_ids = Vec::new();
+
+        if confirm {
+            for feature in &features {
+                self.create_feature_recursive(project_id_uuid, None, feature, &mut created_ids)?;
+            }
+        }
+
+        Ok(PlanFeaturesResponse {
+            proposed_features: features,
+            created: confirm,
+            created_feature_ids: created_ids,
+        })
+    }
 }
 
 #[tool_router]
@@ -1112,6 +1141,78 @@ impl McpServer {
 
         Ok(CallToolResult::success(vec![Content::text(json)]))
     }
+
+    #[tool(
+        description = "Plan and optionally create a feature tree for a project. Pass your proposed features after applying the user story test: 'As a [user], I can [feature]...'. With confirm=false (default), returns the proposal for user review. With confirm=true, creates all features in the database. Use this for initial project setup or adding multiple related features."
+    )]
+    async fn plan_features(
+        &self,
+        params: Parameters<PlanFeaturesRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let req = params.0;
+        let project_id = Self::parse_uuid(&req.project_id)?;
+
+        // Verify project exists
+        self.db
+            .get_project(project_id)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?
+            .ok_or_else(|| McpError::invalid_params("Project not found", None))?;
+
+        let mut created_ids = Vec::new();
+
+        if req.confirm {
+            // Create features recursively
+            for feature in &req.features {
+                self.create_feature_recursive(project_id, None, feature, &mut created_ids)?;
+            }
+        }
+
+        let response = PlanFeaturesResponse {
+            proposed_features: req.features,
+            created: req.confirm,
+            created_feature_ids: created_ids,
+        };
+
+        let json = serde_json::to_string_pretty(&response)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(CallToolResult::success(vec![Content::text(json)]))
+    }
+}
+
+impl McpServer {
+    /// Recursively create features from a ProposedFeature tree
+    fn create_feature_recursive(
+        &self,
+        project_id: Uuid,
+        parent_id: Option<Uuid>,
+        proposed: &ProposedFeature,
+        created_ids: &mut Vec<String>,
+    ) -> Result<Uuid, McpError> {
+        let feature = self
+            .db
+            .create_feature(
+                project_id,
+                CreateFeatureInput {
+                    parent_id,
+                    title: proposed.title.clone(),
+                    story: proposed.story.clone(),
+                    details: proposed.details.clone(),
+                    state: Some(FeatureState::Specified),
+                    priority: Some(proposed.priority),
+                },
+            )
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        created_ids.push(feature.id.to_string());
+
+        // Create children with this feature as parent
+        for child in &proposed.children {
+            self.create_feature_recursive(project_id, Some(feature.id), child, created_ids)?;
+        }
+
+        Ok(feature.id)
+    }
 }
 
 #[tool_handler]
@@ -1137,67 +1238,67 @@ Features are LIVING DOCUMENTATION of system capabilities - not work items to clo
 - A feature describes what the system DOES, not what you're DOING
 - Features should make sense to someone reading them years later
 
+USER-CENTERED FEATURES:
+Features describe what USERS can do with the system. "User" means whoever consumes
+the capability - end users, developers using a library, CLI users, API consumers, etc.
+
+The User Story Test - before creating a feature, complete this sentence:
+  "As a [user of this system], I can [feature name]..."
+
+If it reads naturally, it's likely a good feature:
+  - "As a developer, I can match dynamic URL paths" → Router
+  - "As a CLI user, I can output results as JSON" → JSON Output
+  - "As an API consumer, I can authenticate with OAuth" → OAuth Integration
+
+If it doesn't make sense, reconsider:
+  - "As a user, I can Project Scaffolding" → setup work, not a capability
+  - "As a user, I can Persistence" → quality attribute, not an action
+
+Think: "What can users DO with this system?" Each distinct action = potential feature.
+
 FEATURE NAMING:
-- Name by CAPABILITY: "Router", "Request Validation", "OAuth Integration"
-- NOT by sequence: "Phase 1", "Step 2", "Sprint 3 Work"
-- NOT by task: "Implement routing", "Add validation"
-- NOT by artifact: "Documentation", "Tests", "Benchmarks"
-- Parent features are CATEGORIES, children are CAPABILITIES within that category
+- Name by user capability: "Add Todo", "Filter by Status", "Export Report"
+- Use nouns or short verb phrases: "Router", "Request Validation", "JSON Output"
+- Parent features group related capabilities: "Authentication" contains "Password Login", "OAuth"
+- Use priority field for sequencing, not the title
 
 FEATURE HIERARCHY:
-- Use hierarchy for DOMAIN DECOMPOSITION, not implementation phases
+- Group features by user goal or domain area
 - Parent = capability area (e.g., "Authentication")
 - Children = specific capabilities (e.g., "Password Login", "OAuth", "Session Management")
 - Only LEAF features can have sessions - parents are organizational
-- Flat is fine for small projects; hierarchy helps navigation in large ones
-
-AVOID CATCH-ALL CATEGORIES:
-- If features in a category don't relate to each other, don't group them
-- Anti-pattern parents: "Production", "Infrastructure", "Miscellaneous", "Utilities"
-- These signal task-oriented thinking, not capability thinking
-- Root-level is fine - not every feature needs a parent
-- Standalone capabilities can be root-level: "HTTP Client", "OpenAPI Generation"
+- Flat is fine for small projects; use hierarchy when it aids navigation
+- Standalone capabilities can be root-level - not everything needs a parent
 
 QUALITIES AS FEATURES:
-- Qualities that ARE behaviors can be features:
-  - Observability (logging, metrics, tracing) - the system DOES emit logs
-  - API Documentation - the system DOES generate OpenAPI specs
-  - Audit Logging - the system DOES record who did what
-- Qualities that are ATTRIBUTES should NOT be standalone features:
-  - Performance, Security, Reliability, Testability
-  - These are achieved through implementation of other features
-- Test: "Can I have a concrete session that implements this?"
-  - "Implement logging" ✓ concrete behavior
-  - "Implement performance" ✗ too vague, attribute of other features
-- Embed quality requirements in feature details as acceptance criteria:
-  - Router details: "Must match static routes in <100ns"
-  - Validation details: "Must prevent SQL injection"
+Qualities that manifest as user-visible behaviors can be features:
+  - "Audit Logging" - users can see who did what
+  - "API Documentation" - users can read generated docs
+  - "Error Messages" - users can understand what went wrong
+
+Qualities that are implementation attributes belong in feature details, not as features:
+  - Performance targets → "Router must match in <100ns" (in Router details)
+  - Security requirements → "Must prevent SQL injection" (in Validation details)
+
+Test: "Can a user observe or interact with this?" If yes, it can be a feature.
 
 FEATURE FIELDS:
-- title: Short capability name (2-5 words). No verbs, no phases.
-- story: User perspective - "As a [user], I want [capability] so that [benefit]"
+- title: Short capability name (2-5 words). What users can DO.
+- story: User perspective - "As a [user], I can [capability] so that [benefit]"
 - details: Technical notes, constraints, implementation guidance, acceptance criteria
-- state: proposed (idea) → specified (ready to build) → implemented (done) → deprecated (obsolete)
-- priority: Lower number = implement first. Use this for sequencing, NOT the title.
+- state: proposed (idea) → specified (ready to build) → implemented (done) → deprecated
+- priority: Lower number = implement first. Use for sequencing.
 
 FEATURE vs TASK:
-- Feature = WHAT the system does (persists forever)
+- Feature = WHAT users can do (persists as documentation)
 - Task = HOW you're implementing it (deleted after session)
-- If unsure: "Will this make sense as documentation in 2 years?" → Feature
-- Tasks are throwaway work units; features are permanent capabilities
+- Test: "Will this make sense as a capability description in 2 years?"
 
-EXAMPLES:
-Good feature tree:
+EXAMPLE:
   Authentication/
   ├── Password Login
   ├── OAuth Integration
   └── Session Management
-
-Bad feature tree:
-  Phase 1: Foundation/
-  ├── Step 1: Setup Project
-  ├── Step 2: Add Auth
-  └── Step 3: Write Tests
 
 SETUP (one-time when starting a new project):
 1. Call create_project with name, description, and coding instructions
