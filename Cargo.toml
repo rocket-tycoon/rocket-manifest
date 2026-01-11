@@ -6,6 +6,10 @@ description = "Living feature documentation server for AI-assisted development"
 license = "BUSL-1.1"
 repository = "https://github.com/rocket-tycoon/rocket-manifest"
 
+[[bin]]
+name = "rmf"
+path = "src/main.rs"
+
 [dependencies]
 # Async runtime
 tokio = { version = "1", features = ["full"] }
