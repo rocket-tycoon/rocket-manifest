@@ -1215,12 +1215,42 @@ AGENT WORKFLOW (when assigned a task_id):
 3. Implement the task scope - write code, run tests, verify
 4. Call complete_task when done and verified
 
-QUALITY PRACTICES (apply during all task work):
-- Test-Driven Development: Write tests first when requirements are clear
-- Security Awareness: Consider injection, auth, data exposure in every change
-- Profile Before Optimizing: Measure hot paths before performance work
-- Incremental Commits: Small, verified commits over large batches
-- Read Before Writing: Understand existing patterns before adding code
+INSTRUCTION PRIORITY:
+Task scope > Project instructions > These defaults
+When project or task instructions conflict with guidelines below, follow them instead.
+
+CODING GUIDELINES (sensible defaults for all task work):
+
+Simplicity & Clarity:
+- Implement only what's asked - no extra features or future-proofing
+- Start with the happy path; handle edge cases later (unless security)
+- Write explicit, straightforward code; avoid clever one-liners
+- Skip retry logic and other complexity unless explicitly needed
+
+Code Structure:
+- Keep conditionals/loops under 3 layers of nesting
+- Functions should be 25-30 lines max; break up longer ones
+- Favor pure functions; minimize side effects
+- Prefer concrete over abstract; avoid premature abstraction
+- Each function does one thing well; prefer composition
+
+Best Practices:
+- Validate inputs, especially user data
+- Consider security implications in every change
+- NEVER commit secrets, API keys, or credentials
+- Use guard clauses (early return) to reduce complexity
+- Choose built-in features when sufficient; add packages only when they add real value
+
+Testing:
+- Write tests first when requirements are clear (TDD)
+- Structure tests to describe WHAT the code should do, not HOW
+- Unit tests for domain logic, integration tests for API contracts
+
+Process:
+- Read and understand existing patterns before writing new code
+- Plan complex tasks before implementing
+- Ask questions when requirements are ambiguous
+- Make incremental commits; small, verified changes over large batches
 
 ORCHESTRATOR WORKFLOW (when managing a feature):
 1. Call list_features with state='specified' to find work
