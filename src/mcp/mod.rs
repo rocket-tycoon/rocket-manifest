@@ -1151,6 +1151,28 @@ FEATURE HIERARCHY:
 - Only LEAF features can have sessions - parents are organizational
 - Flat is fine for small projects; hierarchy helps navigation in large ones
 
+AVOID CATCH-ALL CATEGORIES:
+- If features in a category don't relate to each other, don't group them
+- Anti-pattern parents: "Production", "Infrastructure", "Miscellaneous", "Utilities"
+- These signal task-oriented thinking, not capability thinking
+- Root-level is fine - not every feature needs a parent
+- Standalone capabilities can be root-level: "HTTP Client", "OpenAPI Generation"
+
+QUALITIES AS FEATURES:
+- Qualities that ARE behaviors can be features:
+  - Observability (logging, metrics, tracing) - the system DOES emit logs
+  - API Documentation - the system DOES generate OpenAPI specs
+  - Audit Logging - the system DOES record who did what
+- Qualities that are ATTRIBUTES should NOT be standalone features:
+  - Performance, Security, Reliability, Testability
+  - These are achieved through implementation of other features
+- Test: "Can I have a concrete session that implements this?"
+  - "Implement logging" ✓ concrete behavior
+  - "Implement performance" ✗ too vague, attribute of other features
+- Embed quality requirements in feature details as acceptance criteria:
+  - Router details: "Must match static routes in <100ns"
+  - Validation details: "Must prevent SQL injection"
+
 FEATURE FIELDS:
 - title: Short capability name (2-5 words). No verbs, no phases.
 - story: User perspective - "As a [user], I want [capability] so that [benefit]"
@@ -1192,6 +1214,13 @@ AGENT WORKFLOW (when assigned a task_id):
 2. Call start_task to signal you're beginning work
 3. Implement the task scope - write code, run tests, verify
 4. Call complete_task when done and verified
+
+QUALITY PRACTICES (apply during all task work):
+- Test-Driven Development: Write tests first when requirements are clear
+- Security Awareness: Consider injection, auth, data exposure in every change
+- Profile Before Optimizing: Measure hot paths before performance work
+- Incremental Commits: Small, verified commits over large batches
+- Read Before Writing: Understand existing patterns before adding code
 
 ORCHESTRATOR WORKFLOW (when managing a feature):
 1. Call list_features with state='specified' to find work
