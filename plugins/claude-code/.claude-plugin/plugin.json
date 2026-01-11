@@ -1,0 +1,19 @@
+{
+  "name": "rocketmanifest",
+  "version": "0.1.7",
+  "description": "Living feature documentation for AI-assisted development",
+  "author": {
+    "name": "Rocket Tycoon",
+    "url": "https://github.com/rocket-tycoon"
+  },
+  "repository": "https://github.com/rocket-tycoon/rocket-manifest",
+  "homepage": "https://github.com/rocket-tycoon/rocket-manifest",
+  "license": "BUSL-1.1",
+  "keywords": ["feature-management", "documentation", "product-management", "ai-agents", "mcp"],
+  "mcpServers": {
+    "rocket-manifest": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/rmf-wrapper.sh",
+      "args": ["mcp"]
+    }
+  }
+}

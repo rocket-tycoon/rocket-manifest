@@ -1,0 +1,24 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "rocket-tycoon-plugins",
+  "description": "Claude Code plugins from Rocket Tycoon",
+  "owner": {
+    "name": "Rocket Tycoon",
+    "url": "https://github.com/rocket-tycoon"
+  },
+  "plugins": [
+    {
+      "name": "rocketmanifest",
+      "description": "Living feature documentation for AI-assisted development",
+      "version": "0.1.7",
+      "author": {
+        "name": "Rocket Tycoon",
+        "url": "https://github.com/rocket-tycoon"
+      },
+      "source": "./plugins/claude-code",
+      "category": "mcp",
+      "homepage": "https://github.com/rocket-tycoon/rocket-manifest",
+      "tags": ["feature-management", "documentation", "mcp", "product-management", "ai-agents"]
+    }
+  ]
+}
