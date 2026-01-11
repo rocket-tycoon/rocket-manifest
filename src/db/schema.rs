@@ -28,6 +28,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "history_details",
         sql: include_str!("migrations/004_history_details.sql"),
     },
+    Migration {
+        version: "005",
+        name: "feature_priority",
+        sql: include_str!("migrations/005_feature_priority.sql"),
+    },
 ];
 
 pub fn run_migrations(conn: &Connection) -> Result<()> {
@@ -142,7 +147,7 @@ mod tests {
 
         // Verify all migrations were recorded
         let versions = get_applied_migrations(&conn).unwrap();
-        assert_eq!(versions, vec!["001", "002", "003", "004"]);
+        assert_eq!(versions, vec!["001", "002", "003", "004", "005"]);
     }
 
     #[test]
@@ -152,7 +157,7 @@ mod tests {
         run_migrations(&conn).unwrap(); // Should not fail
 
         let versions = get_applied_migrations(&conn).unwrap();
-        assert_eq!(versions, vec!["001", "002", "003", "004"]);
+        assert_eq!(versions, vec!["001", "002", "003", "004", "005"]);
     }
 
     #[test]
@@ -162,8 +167,9 @@ mod tests {
         // Simulate existing database by creating core tables directly
         // Must include projects table for migration 002 to work
         // Must include feature_history table for migration 004 to work
+        // Must include parent_id on features for migration 005 index
         conn.execute_batch("
-            CREATE TABLE features (id TEXT PRIMARY KEY);
+            CREATE TABLE features (id TEXT PRIMARY KEY, parent_id TEXT);
             CREATE TABLE projects (id TEXT PRIMARY KEY, name TEXT, description TEXT, created_at TEXT, updated_at TEXT);
             CREATE TABLE project_directories (id TEXT PRIMARY KEY, project_id TEXT, path TEXT, git_remote TEXT, is_primary INTEGER, created_at TEXT);
             CREATE TABLE feature_history (id TEXT PRIMARY KEY, feature_id TEXT, session_id TEXT, summary TEXT, files_changed JSON, author TEXT, created_at TEXT);
@@ -173,6 +179,6 @@ mod tests {
         run_migrations(&conn).unwrap();
 
         let versions = get_applied_migrations(&conn).unwrap();
-        assert_eq!(versions, vec!["001", "002", "003", "004"]);
+        assert_eq!(versions, vec!["001", "002", "003", "004", "005"]);
     }
 }

@@ -24,6 +24,9 @@ pub struct Feature {
     pub story: Option<String>,
     pub details: Option<String>,
     pub state: FeatureState,
+    /// Priority for ordering features within a parent. Lower values appear first.
+    /// Use this to indicate implementation order without polluting feature titles.
+    pub priority: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -80,6 +83,8 @@ pub struct CreateFeatureInput {
     pub details: Option<String>,
     /// Initial state. Defaults to `Proposed` if not specified.
     pub state: Option<FeatureState>,
+    /// Priority for ordering within parent. Lower values first. Defaults to 0.
+    pub priority: Option<i32>,
 }
 
 /// Input for updating an existing feature. All fields are optional for partial updates.
@@ -91,6 +96,8 @@ pub struct UpdateFeatureInput {
     pub story: Option<String>,
     pub details: Option<String>,
     pub state: Option<FeatureState>,
+    /// Update priority for ordering within parent.
+    pub priority: Option<i32>,
 }
 
 /// A feature with its nested children, used for tree responses.

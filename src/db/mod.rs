@@ -291,8 +291,8 @@ impl Database {
     pub fn get_all_features(&self) -> Result<Vec<Feature>> {
         let conn = self.conn.lock().expect("database lock poisoned");
         let mut stmt = conn.prepare(
-            "SELECT id, project_id, parent_id, title, story, details, state, created_at, updated_at
-             FROM features ORDER BY title",
+            "SELECT id, project_id, parent_id, title, story, details, state, priority, created_at, updated_at
+             FROM features ORDER BY priority, title",
         )?;
 
         let features = stmt
@@ -306,8 +306,9 @@ impl Database {
                     details: row.get(5)?,
                     state: FeatureState::from_str(&row.get::<_, String>(6)?)
                         .unwrap_or(FeatureState::Proposed),
-                    created_at: parse_datetime(row.get::<_, String>(7)?),
-                    updated_at: parse_datetime(row.get::<_, String>(8)?),
+                    priority: row.get(7)?,
+                    created_at: parse_datetime(row.get::<_, String>(8)?),
+                    updated_at: parse_datetime(row.get::<_, String>(9)?),
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -318,8 +319,8 @@ impl Database {
     pub fn get_features_by_project(&self, project_id: Uuid) -> Result<Vec<Feature>> {
         let conn = self.conn.lock().expect("database lock poisoned");
         let mut stmt = conn.prepare(
-            "SELECT id, project_id, parent_id, title, story, details, state, created_at, updated_at
-             FROM features WHERE project_id = ? ORDER BY title",
+            "SELECT id, project_id, parent_id, title, story, details, state, priority, created_at, updated_at
+             FROM features WHERE project_id = ? ORDER BY priority, title",
         )?;
 
         let features = stmt
@@ -333,8 +334,9 @@ impl Database {
                     details: row.get(5)?,
                     state: FeatureState::from_str(&row.get::<_, String>(6)?)
                         .unwrap_or(FeatureState::Proposed),
-                    created_at: parse_datetime(row.get::<_, String>(7)?),
-                    updated_at: parse_datetime(row.get::<_, String>(8)?),
+                    priority: row.get(7)?,
+                    created_at: parse_datetime(row.get::<_, String>(8)?),
+                    updated_at: parse_datetime(row.get::<_, String>(9)?),
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -345,7 +347,7 @@ impl Database {
     pub fn get_feature(&self, id: Uuid) -> Result<Option<Feature>> {
         let conn = self.conn.lock().expect("database lock poisoned");
         let mut stmt = conn.prepare(
-            "SELECT id, project_id, parent_id, title, story, details, state, created_at, updated_at
+            "SELECT id, project_id, parent_id, title, story, details, state, priority, created_at, updated_at
              FROM features WHERE id = ?",
         )?;
 
@@ -360,8 +362,9 @@ impl Database {
                 details: row.get(5)?,
                 state: FeatureState::from_str(&row.get::<_, String>(6)?)
                     .unwrap_or(FeatureState::Proposed),
-                created_at: parse_datetime(row.get::<_, String>(7)?),
-                updated_at: parse_datetime(row.get::<_, String>(8)?),
+                priority: row.get(7)?,
+                created_at: parse_datetime(row.get::<_, String>(8)?),
+                updated_at: parse_datetime(row.get::<_, String>(9)?),
             }))
         } else {
             Ok(None)
@@ -377,10 +380,11 @@ impl Database {
         let id = Uuid::new_v4();
         let now = Utc::now();
         let state = input.state.unwrap_or(FeatureState::Proposed);
+        let priority = input.priority.unwrap_or(0);
 
         conn.execute(
-            "INSERT INTO features (id, project_id, parent_id, title, story, details, state, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO features (id, project_id, parent_id, title, story, details, state, priority, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 id.to_string(),
                 project_id.to_string(),
@@ -389,6 +393,7 @@ impl Database {
                 &input.story,
                 &input.details,
                 state.as_str(),
+                priority,
                 now.to_rfc3339(),
                 now.to_rfc3339(),
             ),
@@ -402,6 +407,7 @@ impl Database {
             story: input.story,
             details: input.details,
             state,
+            priority,
             created_at: now,
             updated_at: now,
         })
@@ -419,15 +425,17 @@ impl Database {
         let details = input.details.or(existing.details);
         let state = input.state.unwrap_or(existing.state);
         let parent_id = input.parent_id.or(existing.parent_id);
+        let priority = input.priority.unwrap_or(existing.priority);
 
         conn.execute(
-            "UPDATE features SET parent_id = ?, title = ?, story = ?, details = ?, state = ?, updated_at = ? WHERE id = ?",
+            "UPDATE features SET parent_id = ?, title = ?, story = ?, details = ?, state = ?, priority = ?, updated_at = ? WHERE id = ?",
             (
                 parent_id.map(|u| u.to_string()),
                 &title,
                 &story,
                 &details,
                 state.as_str(),
+                priority,
                 now.to_rfc3339(),
                 id.to_string(),
             ),
@@ -441,6 +449,7 @@ impl Database {
             story,
             details,
             state,
+            priority,
             created_at: existing.created_at,
             updated_at: now,
         }))
@@ -455,8 +464,8 @@ impl Database {
     pub fn get_root_features(&self, project_id: Uuid) -> Result<Vec<Feature>> {
         let conn = self.conn.lock().expect("database lock poisoned");
         let mut stmt = conn.prepare(
-            "SELECT id, project_id, parent_id, title, story, details, state, created_at, updated_at
-             FROM features WHERE project_id = ? AND parent_id IS NULL ORDER BY title",
+            "SELECT id, project_id, parent_id, title, story, details, state, priority, created_at, updated_at
+             FROM features WHERE project_id = ? AND parent_id IS NULL ORDER BY priority, title",
         )?;
 
         let features = stmt
@@ -470,8 +479,9 @@ impl Database {
                     details: row.get(5)?,
                     state: FeatureState::from_str(&row.get::<_, String>(6)?)
                         .unwrap_or(FeatureState::Proposed),
-                    created_at: parse_datetime(row.get::<_, String>(7)?),
-                    updated_at: parse_datetime(row.get::<_, String>(8)?),
+                    priority: row.get(7)?,
+                    created_at: parse_datetime(row.get::<_, String>(8)?),
+                    updated_at: parse_datetime(row.get::<_, String>(9)?),
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -482,8 +492,8 @@ impl Database {
     pub fn get_children(&self, parent_id: Uuid) -> Result<Vec<Feature>> {
         let conn = self.conn.lock().expect("database lock poisoned");
         let mut stmt = conn.prepare(
-            "SELECT id, project_id, parent_id, title, story, details, state, created_at, updated_at
-             FROM features WHERE parent_id = ? ORDER BY title",
+            "SELECT id, project_id, parent_id, title, story, details, state, priority, created_at, updated_at
+             FROM features WHERE parent_id = ? ORDER BY priority, title",
         )?;
 
         let features = stmt
@@ -497,8 +507,9 @@ impl Database {
                     details: row.get(5)?,
                     state: FeatureState::from_str(&row.get::<_, String>(6)?)
                         .unwrap_or(FeatureState::Proposed),
-                    created_at: parse_datetime(row.get::<_, String>(7)?),
-                    updated_at: parse_datetime(row.get::<_, String>(8)?),
+                    priority: row.get(7)?,
+                    created_at: parse_datetime(row.get::<_, String>(8)?),
+                    updated_at: parse_datetime(row.get::<_, String>(9)?),
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;

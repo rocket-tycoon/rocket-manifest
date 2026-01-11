@@ -98,6 +98,7 @@ speculate! {
                     title: "Feature".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create feature");
 
@@ -163,6 +164,7 @@ speculate! {
                     title: "User Login".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 };
 
@@ -181,6 +183,7 @@ speculate! {
                     story: Some("As a user, I want to log in with OAuth".to_string()),
                     details: Some("## Technical Notes\n\nUse PKCE flow".to_string()),
                     state: Some(FeatureState::Specified),
+                    priority: None,
                 };
 
                 let feature = db.create_feature(project.id, input).expect("Failed to create feature");
@@ -205,6 +208,7 @@ speculate! {
                     title: "Rate Limiting".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 };
                 let created = db.create_feature(project.id, input).expect("Failed to create");
@@ -230,6 +234,7 @@ speculate! {
                     title: "Zebra Feature".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -238,6 +243,7 @@ speculate! {
                     title: "Alpha Feature".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -256,6 +262,7 @@ speculate! {
                     title: Some("New Title".to_string()),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 };
 
@@ -270,6 +277,7 @@ speculate! {
                     title: "Original Title".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: Some(FeatureState::Proposed),
                 }).expect("Failed to create");
 
@@ -278,6 +286,7 @@ speculate! {
                     title: Some("Updated Title".to_string()),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Query failed").expect("Feature not found");
 
@@ -292,6 +301,7 @@ speculate! {
                     title: "Feature".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: Some(FeatureState::Proposed),
                 }).expect("Failed to create");
 
@@ -300,6 +310,7 @@ speculate! {
                     title: None,
                     story: None,
                     details: None,
+                priority: None,
                     state: Some(FeatureState::Implemented),
                 }).expect("Query failed").expect("Feature not found");
 
@@ -320,6 +331,7 @@ speculate! {
                     title: "To Delete".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -341,6 +353,7 @@ speculate! {
                     title: "Authentication".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create parent");
 
@@ -349,6 +362,7 @@ speculate! {
                     title: "Login".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create child");
 
@@ -362,6 +376,7 @@ speculate! {
                     title: "Authentication".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -370,6 +385,7 @@ speculate! {
                     title: "OAuth".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -378,6 +394,7 @@ speculate! {
                     title: "Google".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -396,6 +413,7 @@ speculate! {
                     title: "Root 1".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -404,6 +422,7 @@ speculate! {
                     title: "Root 2".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -412,6 +431,7 @@ speculate! {
                     title: "Child".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -430,6 +450,7 @@ speculate! {
                     title: "Leaf".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -444,6 +465,7 @@ speculate! {
                     title: "Parent".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -452,6 +474,7 @@ speculate! {
                     title: "Zebra Child".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -460,6 +483,7 @@ speculate! {
                     title: "Alpha Child".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -477,6 +501,7 @@ speculate! {
                     title: "Parent".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -485,6 +510,7 @@ speculate! {
                     title: "Child".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -493,6 +519,7 @@ speculate! {
                     title: "Grandchild".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -510,6 +537,7 @@ speculate! {
                     title: "Leaf".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -523,6 +551,7 @@ speculate! {
                     title: "Parent".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -531,6 +560,7 @@ speculate! {
                     title: "Child".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -546,6 +576,7 @@ speculate! {
                     title: "Parent".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -554,6 +585,7 @@ speculate! {
                     title: "Child".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -574,6 +606,7 @@ speculate! {
                     title: "Leaf Feature".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -593,6 +626,7 @@ speculate! {
                     title: "Parent".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -601,6 +635,7 @@ speculate! {
                     title: "Child".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -635,6 +670,7 @@ speculate! {
                     title: "Feature".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -670,6 +706,7 @@ speculate! {
                     title: "Feature".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -706,6 +743,7 @@ speculate! {
                     title: "Feature".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -747,6 +785,7 @@ speculate! {
                     title: "Test Feature".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create feature");
 
@@ -776,6 +815,7 @@ speculate! {
                     title: "Manual Feature".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create feature");
 
@@ -803,6 +843,7 @@ speculate! {
                     title: "New Feature".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create feature");
 
@@ -817,6 +858,7 @@ speculate! {
                     title: "Feature".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create feature");
 
@@ -856,6 +898,7 @@ speculate! {
                     title: "Feature 1".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -864,6 +907,7 @@ speculate! {
                     title: "Feature 2".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 
@@ -904,6 +948,7 @@ speculate! {
                     title: "Feature".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 }).expect("Failed to create");
 

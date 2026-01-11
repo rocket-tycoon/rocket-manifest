@@ -77,6 +77,7 @@ impl McpServer {
                 story: feature.story,
                 details: feature.details,
                 state: feature.state.as_str().to_string(),
+                priority: feature.priority,
             },
             session_goal: session.goal,
         })
@@ -289,6 +290,7 @@ impl McpServer {
                     story: f.story,
                     details: f.details,
                     state: f.state.as_str().to_string(),
+                    priority: f.priority,
                 })
                 .collect(),
         })
@@ -308,6 +310,7 @@ impl McpServer {
             story: feature.story,
             details: feature.details,
             state: feature.state.as_str().to_string(),
+            priority: feature.priority,
         })
     }
 
@@ -370,6 +373,7 @@ impl McpServer {
                     story: None,
                     details: None,
                     state: Some(new_state),
+                    priority: None,
                 },
             )
             .map_err(|e| McpError::internal_error(e.to_string(), None))?
@@ -381,6 +385,7 @@ impl McpServer {
             story: feature.story,
             details: feature.details,
             state: feature.state.as_str().to_string(),
+            priority: feature.priority,
         })
     }
 
@@ -466,6 +471,7 @@ impl McpServer {
                     story: story.map(|s| s.to_string()),
                     details: details.map(|s| s.to_string()),
                     state: Some(state),
+                    priority: None,
                 },
             )
             .map_err(|e| McpError::internal_error(e.to_string(), None))?;
@@ -476,6 +482,7 @@ impl McpServer {
             story: feature.story,
             details: feature.details,
             state: feature.state.as_str().to_string(),
+            priority: feature.priority,
         })
     }
 }
@@ -528,6 +535,7 @@ impl McpServer {
                 story: feature.story,
                 details: feature.details,
                 state: feature.state.as_str().to_string(),
+                priority: feature.priority,
             },
             session_goal: session.goal,
         };
@@ -835,6 +843,7 @@ impl McpServer {
                     story: f.story,
                     details: f.details,
                     state: f.state.as_str().to_string(),
+                    priority: f.priority,
                 })
                 .collect(),
         };
@@ -867,6 +876,7 @@ impl McpServer {
             story: feature.story,
             details: feature.details,
             state: feature.state.as_str().to_string(),
+            priority: feature.priority,
         };
 
         let json = serde_json::to_string_pretty(&result)
@@ -957,6 +967,7 @@ impl McpServer {
                     story: None,
                     details: None,
                     state: Some(new_state),
+                    priority: None,
                 },
             )
             .map_err(|e| McpError::internal_error(e.to_string(), None))?
@@ -968,6 +979,7 @@ impl McpServer {
             story: feature.story,
             details: feature.details,
             state: feature.state.as_str().to_string(),
+            priority: feature.priority,
         };
 
         let json = serde_json::to_string_pretty(&result)
@@ -1081,6 +1093,7 @@ impl McpServer {
                     story: req.story,
                     details: req.details,
                     state: Some(state),
+                    priority: req.priority,
                 },
             )
             .map_err(|e| McpError::internal_error(e.to_string(), None))?;
@@ -1091,6 +1104,7 @@ impl McpServer {
             story: feature.story,
             details: feature.details,
             state: feature.state.as_str().to_string(),
+            priority: feature.priority,
         };
 
         let json = serde_json::to_string_pretty(&result)
@@ -1121,6 +1135,14 @@ SETUP (one-time when starting a new project):
 1. Call create_project with name, description, and coding instructions
 2. Call add_project_directory to associate your codebase directory with the project
 3. Call create_feature to define features to implement
+
+FEATURE NAMING GUIDELINES:
+- Name features by CAPABILITY, not by implementation phase or order
+- BAD: "Phase 1: Core Routing", "Step 2: Add Validation"
+- GOOD: "Router", "Request Validation", "OpenAPI Generation"
+- Use the 'priority' field to indicate implementation order (lower = first)
+- Features are LIVING DOCUMENTATION - they describe what the system does long-term
+- Put implementation notes or phase info in 'details', not in the title
 
 DISCOVERY (find what to work on):
 - get_project_context: Given your CWD, find the project and its instructions

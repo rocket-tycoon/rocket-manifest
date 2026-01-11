@@ -54,6 +54,7 @@ mod feature_roots {
                 state: None,
                 story: None,
                 details: None,
+                priority: None,
             })
             .await
             .json::<Feature>();
@@ -67,6 +68,7 @@ mod feature_roots {
                 state: None,
                 story: None,
                 details: None,
+                priority: None,
             })
             .await;
 
@@ -98,6 +100,7 @@ mod feature_children {
                 state: None,
                 story: None,
                 details: None,
+                priority: None,
             })
             .await
             .json::<Feature>();
@@ -124,6 +127,7 @@ mod feature_children {
                 state: None,
                 story: None,
                 details: None,
+                priority: None,
             })
             .await
             .json::<Feature>();
@@ -136,6 +140,7 @@ mod feature_children {
                 state: None,
                 story: None,
                 details: None,
+                priority: None,
             })
             .await;
 
@@ -147,6 +152,7 @@ mod feature_children {
                 state: None,
                 story: None,
                 details: None,
+                priority: None,
             })
             .await;
 
@@ -174,6 +180,7 @@ mod feature_children {
                 state: None,
                 story: None,
                 details: None,
+                priority: None,
             })
             .await
             .json::<Feature>();
@@ -186,6 +193,7 @@ mod feature_children {
                 state: None,
                 story: None,
                 details: None,
+                priority: None,
             })
             .await
             .json::<Feature>();
@@ -198,6 +206,7 @@ mod feature_children {
                 state: None,
                 story: None,
                 details: None,
+                priority: None,
             })
             .await;
 
@@ -228,6 +237,7 @@ mod feature_hierarchy_create {
                 state: None,
                 story: None,
                 details: None,
+                priority: None,
             })
             .await
             .json::<Feature>();
@@ -240,6 +250,7 @@ mod feature_hierarchy_create {
                 state: None,
                 story: None,
                 details: None,
+                priority: None,
             })
             .await;
 
@@ -262,6 +273,7 @@ mod feature_hierarchy_create {
                 state: None,
                 story: None,
                 details: None,
+                priority: None,
             })
             .await
             .json::<Feature>();
@@ -274,6 +286,7 @@ mod feature_hierarchy_create {
                 state: None,
                 story: None,
                 details: None,
+                priority: None,
             })
             .await
             .json::<Feature>();
@@ -286,6 +299,7 @@ mod feature_hierarchy_create {
                 state: None,
                 story: None,
                 details: None,
+                priority: None,
             })
             .await
             .json::<Feature>();
@@ -315,6 +329,7 @@ mod feature_cascade_delete {
                 state: None,
                 story: None,
                 details: None,
+                priority: None,
             })
             .await
             .json::<Feature>();
@@ -327,6 +342,7 @@ mod feature_cascade_delete {
                 state: None,
                 story: None,
                 details: None,
+                priority: None,
             })
             .await
             .json::<Feature>();
@@ -360,6 +376,7 @@ mod feature_history {
                 title: "New Feature".to_string(),
                 story: None,
                 details: None,
+                priority: None,
                 state: None,
             })
             .await
@@ -391,6 +408,7 @@ mod session_leaf_validation {
                 state: None,
                 story: None,
                 details: None,
+                priority: None,
             })
             .await
             .json::<Feature>();
@@ -420,6 +438,7 @@ mod session_leaf_validation {
                 state: None,
                 story: None,
                 details: None,
+                priority: None,
             })
             .await
             .json::<Feature>();
@@ -432,6 +451,7 @@ mod session_leaf_validation {
                 state: None,
                 story: None,
                 details: None,
+                priority: None,
             })
             .await;
 
@@ -466,6 +486,7 @@ mod session_completion {
                 state: None,
                 story: None,
                 details: None,
+                priority: None,
             })
             .await
             .json::<Feature>();
@@ -516,6 +537,7 @@ mod session_completion {
                 state: None,
                 story: None,
                 details: None,
+                priority: None,
             })
             .await
             .json::<Feature>();
@@ -841,6 +863,7 @@ mod features {
                 title: "Feature 1".to_string(),
                 story: None,
                 details: None,
+                priority: None,
                 state: None,
             })
             .await;
@@ -852,6 +875,7 @@ mod features {
                 title: "Feature 2".to_string(),
                 story: None,
                 details: None,
+                priority: None,
                 state: None,
             })
             .await;
@@ -876,6 +900,7 @@ mod features {
                 story: Some("As a user...".to_string()),
                 details: Some("Implementation details".to_string()),
                 state: Some(FeatureState::Specified),
+                priority: None,
             })
             .await
             .json::<Feature>();
@@ -913,6 +938,7 @@ mod features {
                 title: "Original Title".to_string(),
                 story: None,
                 details: None,
+                priority: None,
                 state: Some(FeatureState::Proposed),
             })
             .await
@@ -925,6 +951,7 @@ mod features {
                 title: Some("Updated Title".to_string()),
                 story: Some("New story".to_string()),
                 details: None,
+                priority: None,
                 state: Some(FeatureState::Implemented),
             })
             .await;
@@ -948,6 +975,7 @@ mod features {
                 title: Some("Title".to_string()),
                 story: None,
                 details: None,
+                priority: None,
                 state: None,
             })
             .await;
@@ -975,6 +1003,7 @@ mod feature_tree {
                 title: "Authentication".to_string(),
                 story: None,
                 details: None,
+                priority: None,
                 state: None,
             })
             .await
@@ -987,6 +1016,7 @@ mod feature_tree {
                 title: "Login".to_string(),
                 story: None,
                 details: None,
+                priority: None,
                 state: None,
             })
             .await;
@@ -998,6 +1028,7 @@ mod feature_tree {
                 title: "Logout".to_string(),
                 story: None,
                 details: None,
+                priority: None,
                 state: None,
             })
             .await;
@@ -1033,6 +1064,7 @@ mod sessions {
                 title: "Feature".to_string(),
                 story: None,
                 details: None,
+                priority: None,
                 state: None,
             })
             .await
@@ -1081,6 +1113,7 @@ mod sessions {
                 title: "Feature Title".to_string(),
                 story: None,
                 details: None,
+                priority: None,
                 state: None,
             })
             .await
@@ -1136,6 +1169,7 @@ mod tasks {
                 title: "Feature".to_string(),
                 story: None,
                 details: None,
+                priority: None,
                 state: None,
             })
             .await
@@ -1190,6 +1224,7 @@ mod tasks {
                 title: "Feature".to_string(),
                 story: None,
                 details: None,
+                priority: None,
                 state: None,
             })
             .await

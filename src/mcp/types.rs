@@ -187,6 +187,11 @@ pub struct CreateFeatureRequest {
     )]
     #[serde(default = "default_proposed")]
     pub state: String,
+    #[schemars(
+        description = "Priority for ordering within parent. Lower values appear first. Defaults to 0."
+    )]
+    #[serde(default)]
+    pub priority: Option<i32>,
 }
 
 fn default_proposed() -> String {
@@ -223,6 +228,8 @@ pub struct FeatureInfo {
     pub story: Option<String>,
     pub details: Option<String>,
     pub state: String,
+    /// Priority for ordering within parent. Lower values appear first.
+    pub priority: i32,
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]

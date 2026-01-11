@@ -36,6 +36,7 @@ fn create_test_feature(db: &Database, project_id: uuid::Uuid) -> Feature {
             story: Some("As a user, I want to test".to_string()),
             details: Some("Implementation details".to_string()),
             state: Some(FeatureState::Specified),
+            priority: None,
         },
     )
     .expect("Failed to create feature")
@@ -232,6 +233,7 @@ mod orchestrator_tools {
                     title: "Child".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 },
             )
@@ -477,6 +479,7 @@ mod discovery_tools {
                     title: "Second Feature".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: Some(FeatureState::Proposed),
                 },
             )
@@ -507,6 +510,7 @@ mod discovery_tools {
                     title: "Other Feature".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: None,
                 },
             )
@@ -533,6 +537,7 @@ mod discovery_tools {
                     title: "Proposed Feature".to_string(),
                     story: None,
                     details: None,
+                priority: None,
                     state: Some(FeatureState::Proposed),
                 },
             )
