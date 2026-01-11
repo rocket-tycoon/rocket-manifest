@@ -1,6 +1,6 @@
 [package]
 name = "rocket-manifest"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "Living feature documentation server for AI-assisted development"
 license = "BUSL-1.1"
