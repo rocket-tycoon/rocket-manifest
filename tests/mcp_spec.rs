@@ -704,3 +704,306 @@ mod discovery_tools {
         }
     }
 }
+
+// ============================================================
+// Setup Tools Tests
+// ============================================================
+
+mod setup_tools {
+    use super::*;
+
+    mod create_project {
+        use super::*;
+
+        #[tokio::test]
+        async fn creates_project_with_all_fields() {
+            let (server, db) = setup();
+
+            let response = server
+                .test_create_project(
+                    "My Project",
+                    Some("A description"),
+                    Some("Follow coding-guidelines.md"),
+                )
+                .expect("Tool failed");
+
+            assert_eq!(response.name, "My Project");
+            assert_eq!(response.description, Some("A description".to_string()));
+            assert_eq!(
+                response.instructions,
+                Some("Follow coding-guidelines.md".to_string())
+            );
+
+            // Verify in database
+            let project = db
+                .get_project(uuid::Uuid::parse_str(&response.id).unwrap())
+                .expect("Query failed")
+                .unwrap();
+            assert_eq!(project.name, "My Project");
+        }
+
+        #[tokio::test]
+        async fn creates_project_with_minimal_fields() {
+            let (server, _db) = setup();
+
+            let response = server
+                .test_create_project("Minimal Project", None, None)
+                .expect("Tool failed");
+
+            assert_eq!(response.name, "Minimal Project");
+            assert!(response.description.is_none());
+            assert!(response.instructions.is_none());
+        }
+    }
+
+    mod add_project_directory {
+        use super::*;
+
+        #[tokio::test]
+        async fn adds_directory_with_all_fields() {
+            let (server, db) = setup();
+            let project = create_test_project(&db);
+
+            let response = server
+                .test_add_project_directory(
+                    &project.id.to_string(),
+                    "/Users/dev/my-project",
+                    Some("git@github.com:org/repo.git"),
+                    true,
+                    Some("cargo build && cargo test"),
+                )
+                .expect("Tool failed");
+
+            assert_eq!(response.path, "/Users/dev/my-project");
+            assert_eq!(
+                response.git_remote,
+                Some("git@github.com:org/repo.git".to_string())
+            );
+            assert!(response.is_primary);
+            assert_eq!(
+                response.instructions,
+                Some("cargo build && cargo test".to_string())
+            );
+        }
+
+        #[tokio::test]
+        async fn adds_directory_with_minimal_fields() {
+            let (server, db) = setup();
+            let project = create_test_project(&db);
+
+            let response = server
+                .test_add_project_directory(
+                    &project.id.to_string(),
+                    "/Users/dev/project",
+                    None,
+                    false,
+                    None,
+                )
+                .expect("Tool failed");
+
+            assert_eq!(response.path, "/Users/dev/project");
+            assert!(response.git_remote.is_none());
+            assert!(!response.is_primary);
+            assert!(response.instructions.is_none());
+        }
+
+        #[tokio::test]
+        async fn returns_error_for_nonexistent_project() {
+            let (server, _db) = setup();
+
+            let result = server.test_add_project_directory(
+                &uuid::Uuid::new_v4().to_string(),
+                "/some/path",
+                None,
+                false,
+                None,
+            );
+
+            assert!(result.is_err());
+        }
+
+        #[tokio::test]
+        async fn enables_get_project_context_lookup() {
+            let (server, db) = setup();
+            let project = create_test_project(&db);
+
+            // Add directory via MCP tool
+            server
+                .test_add_project_directory(
+                    &project.id.to_string(),
+                    "/Users/dev/my-app",
+                    None,
+                    true,
+                    None,
+                )
+                .expect("Tool failed");
+
+            // Should now be discoverable via get_project_context
+            let context = server
+                .test_get_project_context("/Users/dev/my-app/src")
+                .expect("Lookup failed");
+
+            assert_eq!(context.project.name, "Test Project");
+        }
+    }
+
+    mod create_feature {
+        use super::*;
+
+        #[tokio::test]
+        async fn creates_feature_with_all_fields() {
+            let (server, db) = setup();
+            let project = create_test_project(&db);
+
+            let response = server
+                .test_create_feature(
+                    &project.id.to_string(),
+                    None,
+                    "User Authentication",
+                    Some("As a user, I want to log in so that I can access my data"),
+                    Some("Use JWT tokens, 24h expiry"),
+                    "specified",
+                )
+                .expect("Tool failed");
+
+            assert_eq!(response.title, "User Authentication");
+            assert_eq!(
+                response.story,
+                Some("As a user, I want to log in so that I can access my data".to_string())
+            );
+            assert_eq!(
+                response.details,
+                Some("Use JWT tokens, 24h expiry".to_string())
+            );
+            assert_eq!(response.state, "specified");
+
+            // Verify in database
+            let feature = db
+                .get_feature(uuid::Uuid::parse_str(&response.id).unwrap())
+                .expect("Query failed")
+                .unwrap();
+            assert_eq!(feature.title, "User Authentication");
+        }
+
+        #[tokio::test]
+        async fn creates_feature_with_minimal_fields() {
+            let (server, _db) = setup();
+            let project = create_test_project(&_db);
+
+            let response = server
+                .test_create_feature(
+                    &project.id.to_string(),
+                    None,
+                    "Simple Feature",
+                    None,
+                    None,
+                    "proposed",
+                )
+                .expect("Tool failed");
+
+            assert_eq!(response.title, "Simple Feature");
+            assert!(response.story.is_none());
+            assert!(response.details.is_none());
+            assert_eq!(response.state, "proposed");
+        }
+
+        #[tokio::test]
+        async fn creates_nested_feature() {
+            let (server, db) = setup();
+            let project = create_test_project(&db);
+
+            // Create parent feature
+            let parent = server
+                .test_create_feature(
+                    &project.id.to_string(),
+                    None,
+                    "Authentication",
+                    None,
+                    None,
+                    "proposed",
+                )
+                .expect("Tool failed");
+
+            // Create child feature
+            let child = server
+                .test_create_feature(
+                    &project.id.to_string(),
+                    Some(&parent.id),
+                    "OAuth Login",
+                    None,
+                    None,
+                    "proposed",
+                )
+                .expect("Tool failed");
+
+            // Verify parent-child relationship
+            let child_feature = db
+                .get_feature(uuid::Uuid::parse_str(&child.id).unwrap())
+                .expect("Query failed")
+                .unwrap();
+            assert_eq!(
+                child_feature.parent_id,
+                Some(uuid::Uuid::parse_str(&parent.id).unwrap())
+            );
+        }
+
+        #[tokio::test]
+        async fn returns_error_for_invalid_state() {
+            let (server, db) = setup();
+            let project = create_test_project(&db);
+
+            let result = server.test_create_feature(
+                &project.id.to_string(),
+                None,
+                "Feature",
+                None,
+                None,
+                "invalid_state",
+            );
+
+            assert!(result.is_err());
+        }
+
+        #[tokio::test]
+        async fn returns_error_for_nonexistent_project() {
+            let (server, _db) = setup();
+
+            let result = server.test_create_feature(
+                &uuid::Uuid::new_v4().to_string(),
+                None,
+                "Feature",
+                None,
+                None,
+                "proposed",
+            );
+
+            assert!(result.is_err());
+        }
+
+        #[tokio::test]
+        async fn feature_can_have_session_created() {
+            let (server, db) = setup();
+            let project = create_test_project(&db);
+
+            // Create feature via MCP
+            let feature = server
+                .test_create_feature(
+                    &project.id.to_string(),
+                    None,
+                    "Implementable Feature",
+                    Some("User story here"),
+                    Some("Details here"),
+                    "specified",
+                )
+                .expect("Tool failed");
+
+            // Create session on that feature
+            let session = server
+                .test_create_session(&feature.id, "Implement the feature")
+                .expect("Session creation failed");
+
+            assert_eq!(session.feature_id, feature.id);
+            assert_eq!(session.status, "active");
+        }
+    }
+}

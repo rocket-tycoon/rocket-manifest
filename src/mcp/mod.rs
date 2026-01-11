@@ -383,6 +383,101 @@ impl McpServer {
             state: feature.state.as_str().to_string(),
         })
     }
+
+    pub fn test_create_project(
+        &self,
+        name: &str,
+        description: Option<&str>,
+        instructions: Option<&str>,
+    ) -> Result<ProjectInfo, McpError> {
+        let project = self
+            .db
+            .create_project(CreateProjectInput {
+                name: name.to_string(),
+                description: description.map(|s| s.to_string()),
+                instructions: instructions.map(|s| s.to_string()),
+            })
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(ProjectInfo {
+            id: project.id.to_string(),
+            name: project.name,
+            description: project.description,
+            instructions: project.instructions,
+        })
+    }
+
+    pub fn test_add_project_directory(
+        &self,
+        project_id: &str,
+        path: &str,
+        git_remote: Option<&str>,
+        is_primary: bool,
+        instructions: Option<&str>,
+    ) -> Result<DirectoryInfo, McpError> {
+        let project_id = Self::parse_uuid(project_id)?;
+
+        let directory = self
+            .db
+            .add_project_directory(
+                project_id,
+                AddDirectoryInput {
+                    path: path.to_string(),
+                    git_remote: git_remote.map(|s| s.to_string()),
+                    is_primary,
+                    instructions: instructions.map(|s| s.to_string()),
+                },
+            )
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(DirectoryInfo {
+            id: directory.id.to_string(),
+            path: directory.path,
+            git_remote: directory.git_remote,
+            is_primary: directory.is_primary,
+            instructions: directory.instructions,
+        })
+    }
+
+    pub fn test_create_feature(
+        &self,
+        project_id: &str,
+        parent_id: Option<&str>,
+        title: &str,
+        story: Option<&str>,
+        details: Option<&str>,
+        state: &str,
+    ) -> Result<FeatureInfo, McpError> {
+        let project_id = Self::parse_uuid(project_id)?;
+        let parent_id = match parent_id {
+            Some(pid) => Some(Self::parse_uuid(pid)?),
+            None => None,
+        };
+        let state = FeatureState::from_str(state)
+            .map_err(|_| McpError::invalid_params(format!("Invalid state '{}'", state), None))?;
+
+        let feature = self
+            .db
+            .create_feature(
+                project_id,
+                CreateFeatureInput {
+                    parent_id,
+                    title: title.to_string(),
+                    story: story.map(|s| s.to_string()),
+                    details: details.map(|s| s.to_string()),
+                    state: Some(state),
+                },
+            )
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(FeatureInfo {
+            id: feature.id.to_string(),
+            title: feature.title,
+            story: feature.story,
+            details: feature.details,
+            state: feature.state.as_str().to_string(),
+        })
+    }
 }
 
 #[tool_router]
@@ -880,6 +975,129 @@ impl McpServer {
 
         Ok(CallToolResult::success(vec![Content::text(json)]))
     }
+
+    // ============================================================
+    // Setup Tools - Create projects, directories, and features
+    // ============================================================
+
+    #[tool(
+        description = "Create a new project. Projects are containers for features and can have multiple directories (e.g., monorepo subdirectories). Use this when starting work on a new codebase. After creating, use add_project_directory to associate directories."
+    )]
+    async fn create_project(
+        &self,
+        params: Parameters<CreateProjectRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let req = params.0;
+
+        let project = self
+            .db
+            .create_project(CreateProjectInput {
+                name: req.name,
+                description: req.description,
+                instructions: req.instructions,
+            })
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        let result = ProjectInfo {
+            id: project.id.to_string(),
+            name: project.name,
+            description: project.description,
+            instructions: project.instructions,
+        };
+
+        let json = serde_json::to_string_pretty(&result)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(CallToolResult::success(vec![Content::text(json)]))
+    }
+
+    #[tool(
+        description = "Associate a directory with a project. This enables get_project_context to find the project when given a directory path. Use after create_project. Mark one directory as is_primary=true for the main project location. Include instructions for directory-specific build/test commands."
+    )]
+    async fn add_project_directory(
+        &self,
+        params: Parameters<AddProjectDirectoryRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let req = params.0;
+        let project_id = Self::parse_uuid(&req.project_id)?;
+
+        let directory = self
+            .db
+            .add_project_directory(
+                project_id,
+                AddDirectoryInput {
+                    path: req.path,
+                    git_remote: req.git_remote,
+                    is_primary: req.is_primary,
+                    instructions: req.instructions,
+                },
+            )
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        let result = DirectoryInfo {
+            id: directory.id.to_string(),
+            path: directory.path,
+            git_remote: directory.git_remote,
+            is_primary: directory.is_primary,
+            instructions: directory.instructions,
+        };
+
+        let json = serde_json::to_string_pretty(&result)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(CallToolResult::success(vec![Content::text(json)]))
+    }
+
+    #[tool(
+        description = "Create a feature within a project. Features can be hierarchical (parent_id for nesting) or flat. Use 'proposed' state for ideas, 'specified' when ready for implementation. Include story (user story format) and details (technical notes) to guide implementation."
+    )]
+    async fn create_feature(
+        &self,
+        params: Parameters<CreateFeatureRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let req = params.0;
+        let project_id = Self::parse_uuid(&req.project_id)?;
+        let parent_id = match req.parent_id {
+            Some(pid) => Some(Self::parse_uuid(&pid)?),
+            None => None,
+        };
+        let state = FeatureState::from_str(&req.state).map_err(|_| {
+            McpError::invalid_params(
+                format!(
+                    "Invalid state '{}'. Must be: proposed, specified, implemented, or deprecated",
+                    req.state
+                ),
+                None,
+            )
+        })?;
+
+        let feature = self
+            .db
+            .create_feature(
+                project_id,
+                CreateFeatureInput {
+                    parent_id,
+                    title: req.title,
+                    story: req.story,
+                    details: req.details,
+                    state: Some(state),
+                },
+            )
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        let result = FeatureInfo {
+            id: feature.id.to_string(),
+            title: feature.title,
+            story: feature.story,
+            details: feature.details,
+            state: feature.state.as_str().to_string(),
+        };
+
+        let json = serde_json::to_string_pretty(&result)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(CallToolResult::success(vec![Content::text(json)]))
+    }
 }
 
 #[tool_handler]
@@ -888,6 +1106,11 @@ impl ServerHandler for McpServer {
         ServerInfo {
             instructions: Some(
                 r#"RocketManifest manages feature implementation sessions and tasks.
+
+SETUP (one-time when starting a new project):
+1. Call create_project with name, description, and coding instructions
+2. Call add_project_directory to associate your codebase directory with the project
+3. Call create_feature to define features to implement
 
 DISCOVERY (find what to work on):
 - get_project_context: Given your CWD, find the project and its instructions

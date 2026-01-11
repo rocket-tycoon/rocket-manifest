@@ -130,6 +130,69 @@ pub struct UpdateFeatureStateRequest {
     pub state: String,
 }
 
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct CreateProjectRequest {
+    #[schemars(description = "The project name (e.g., 'RocketShip', 'MyApp')")]
+    pub name: String,
+    #[schemars(description = "Optional description of the project")]
+    #[serde(default)]
+    pub description: Option<String>,
+    #[schemars(
+        description = "Optional project-wide instructions for AI agents (coding guidelines, conventions)"
+    )]
+    #[serde(default)]
+    pub instructions: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct AddProjectDirectoryRequest {
+    #[schemars(description = "The UUID of the project to add this directory to")]
+    pub project_id: String,
+    #[schemars(description = "Absolute path to the directory (e.g., '/Users/me/projects/myapp')")]
+    pub path: String,
+    #[schemars(description = "Optional git remote URL (e.g., 'git@github.com:org/repo.git')")]
+    #[serde(default)]
+    pub git_remote: Option<String>,
+    #[schemars(
+        description = "Whether this is the primary directory for the project. Defaults to false."
+    )]
+    #[serde(default)]
+    pub is_primary: bool,
+    #[schemars(
+        description = "Optional directory-specific instructions (build commands, test commands)"
+    )]
+    #[serde(default)]
+    pub instructions: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct CreateFeatureRequest {
+    #[schemars(description = "The UUID of the project this feature belongs to")]
+    pub project_id: String,
+    #[schemars(description = "Optional parent feature UUID for hierarchical features")]
+    #[serde(default)]
+    pub parent_id: Option<String>,
+    #[schemars(description = "Short title for the feature (e.g., 'User Authentication')")]
+    pub title: String,
+    #[schemars(
+        description = "Optional user story in 'As a... I want... So that...' format"
+    )]
+    #[serde(default)]
+    pub story: Option<String>,
+    #[schemars(description = "Optional implementation details and technical notes")]
+    #[serde(default)]
+    pub details: Option<String>,
+    #[schemars(
+        description = "Initial state: 'proposed' (default), 'specified', 'implemented', or 'deprecated'"
+    )]
+    #[serde(default = "default_proposed")]
+    pub state: String,
+}
+
+fn default_proposed() -> String {
+    "proposed".to_string()
+}
+
 // ============================================================
 // Response Types
 // ============================================================
