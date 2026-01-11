@@ -96,6 +96,40 @@ fn default_true() -> bool {
     true
 }
 
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct ListFeaturesRequest {
+    #[schemars(description = "Optional project UUID to filter features by project")]
+    pub project_id: Option<String>,
+    #[schemars(
+        description = "Optional state filter: 'proposed', 'specified', 'implemented', or 'deprecated'"
+    )]
+    pub state: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetFeatureRequest {
+    #[schemars(description = "The UUID of the feature to retrieve")]
+    pub feature_id: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetProjectContextRequest {
+    #[schemars(
+        description = "The directory path to look up (e.g., current working directory). Returns the project that contains this directory."
+    )]
+    pub directory_path: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct UpdateFeatureStateRequest {
+    #[schemars(description = "The UUID of the feature to update")]
+    pub feature_id: String,
+    #[schemars(
+        description = "The new state: 'proposed', 'specified', 'implemented', or 'deprecated'"
+    )]
+    pub state: String,
+}
+
 // ============================================================
 // Response Types
 // ============================================================
@@ -148,4 +182,34 @@ pub struct CompleteSessionResponse {
     pub feature_id: String,
     pub feature_state: String,
     pub history_entry_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct FeatureListResponse {
+    pub features: Vec<FeatureInfo>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct ProjectContextResponse {
+    pub project: ProjectInfo,
+    pub directory: DirectoryInfo,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct ProjectInfo {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    /// Project-wide instructions for AI agents (coding guidelines, conventions).
+    pub instructions: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct DirectoryInfo {
+    pub id: String,
+    pub path: String,
+    pub git_remote: Option<String>,
+    pub is_primary: bool,
+    /// Directory-specific instructions (build commands, test commands).
+    pub instructions: Option<String>,
 }
