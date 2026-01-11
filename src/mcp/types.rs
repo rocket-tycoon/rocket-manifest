@@ -174,9 +174,7 @@ pub struct CreateFeatureRequest {
     pub parent_id: Option<String>,
     #[schemars(description = "Short title for the feature (e.g., 'User Authentication')")]
     pub title: String,
-    #[schemars(
-        description = "Optional user story in 'As a... I want... So that...' format"
-    )]
+    #[schemars(description = "Optional user story in 'As a... I want... So that...' format")]
     #[serde(default)]
     pub story: Option<String>,
     #[schemars(description = "Optional implementation details and technical notes")]

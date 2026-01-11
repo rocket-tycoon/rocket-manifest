@@ -233,7 +233,7 @@ mod orchestrator_tools {
                     title: "Child".to_string(),
                     story: None,
                     details: None,
-                priority: None,
+                    priority: None,
                     state: None,
                 },
             )
@@ -479,7 +479,7 @@ mod discovery_tools {
                     title: "Second Feature".to_string(),
                     story: None,
                     details: None,
-                priority: None,
+                    priority: None,
                     state: Some(FeatureState::Proposed),
                 },
             )
@@ -510,7 +510,7 @@ mod discovery_tools {
                     title: "Other Feature".to_string(),
                     story: None,
                     details: None,
-                priority: None,
+                    priority: None,
                     state: None,
                 },
             )
@@ -537,7 +537,7 @@ mod discovery_tools {
                     title: "Proposed Feature".to_string(),
                     story: None,
                     details: None,
-                priority: None,
+                    priority: None,
                     state: Some(FeatureState::Proposed),
                 },
             )

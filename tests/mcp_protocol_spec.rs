@@ -91,7 +91,9 @@ impl McpTestClient {
     /// Read a message as line-delimited JSON
     fn read_message(&mut self) -> String {
         let mut line = String::new();
-        self.reader.read_line(&mut line).expect("Failed to read line");
+        self.reader
+            .read_line(&mut line)
+            .expect("Failed to read line");
         line.trim().to_string()
     }
 
@@ -285,7 +287,10 @@ mod tool_calls {
             .expect("Expected text content");
 
         let project: Value = serde_json::from_str(text).expect("Expected JSON in text");
-        assert_eq!(project.get("name").and_then(|n| n.as_str()), Some("Test Project"));
+        assert_eq!(
+            project.get("name").and_then(|n| n.as_str()),
+            Some("Test Project")
+        );
         assert!(project.get("id").is_some());
     }
 
@@ -295,10 +300,8 @@ mod tool_calls {
         client.initialize();
 
         // Create project first
-        let project_response = client.call_tool(
-            "create_project",
-            json!({ "name": "Feature Test Project" }),
-        );
+        let project_response =
+            client.call_tool("create_project", json!({ "name": "Feature Test Project" }));
         let project_text = extract_text_content(&project_response);
         let project: Value = serde_json::from_str(&project_text).unwrap();
         let project_id = project.get("id").and_then(|id| id.as_str()).unwrap();
@@ -323,10 +326,7 @@ mod tool_calls {
         );
 
         // List features
-        let list_response = client.call_tool(
-            "list_features",
-            json!({ "project_id": project_id }),
-        );
+        let list_response = client.call_tool("list_features", json!({ "project_id": project_id }));
         assert!(list_response.error.is_none());
 
         let list_text = extract_text_content(&list_response);
@@ -341,10 +341,9 @@ mod tool_calls {
         client.initialize();
 
         // Setup: create project and feature
-        let project_text = extract_text_content(&client.call_tool(
-            "create_project",
-            json!({ "name": "Workflow Test" }),
-        ));
+        let project_text = extract_text_content(
+            &client.call_tool("create_project", json!({ "name": "Workflow Test" })),
+        );
         let project: Value = serde_json::from_str(&project_text).unwrap();
         let project_id = project["id"].as_str().unwrap();
 
@@ -386,10 +385,9 @@ mod tool_calls {
         assert_eq!(task["status"].as_str(), Some("pending"));
 
         // 3. Get task context
-        let context_text = extract_text_content(&client.call_tool(
-            "get_task_context",
-            json!({ "task_id": task_id }),
-        ));
+        let context_text = extract_text_content(
+            &client.call_tool("get_task_context", json!({ "task_id": task_id })),
+        );
         let context: Value = serde_json::from_str(&context_text).unwrap();
         assert_eq!(context["task"]["title"].as_str(), Some("Write tests"));
         assert_eq!(context["feature"]["title"].as_str(), Some("Test Feature"));
@@ -413,13 +411,15 @@ mod tool_calls {
             }),
         ));
         let complete_session: Value = serde_json::from_str(&complete_session_text).unwrap();
-        assert_eq!(complete_session["feature_state"].as_str(), Some("implemented"));
+        assert_eq!(
+            complete_session["feature_state"].as_str(),
+            Some("implemented")
+        );
 
         // 7. Verify feature state changed
-        let get_feature_text = extract_text_content(&client.call_tool(
-            "get_feature",
-            json!({ "feature_id": feature_id }),
-        ));
+        let get_feature_text = extract_text_content(
+            &client.call_tool("get_feature", json!({ "feature_id": feature_id })),
+        );
         let updated_feature: Value = serde_json::from_str(&get_feature_text).unwrap();
         assert_eq!(updated_feature["state"].as_str(), Some("implemented"));
     }
@@ -459,11 +459,11 @@ mod tool_calls {
         ));
         let context: Value = serde_json::from_str(&context_text).unwrap();
         assert_eq!(context["project"]["name"].as_str(), Some("Directory Test"));
+        assert_eq!(context["project"]["instructions"].as_str(), Some("Use TDD"));
         assert_eq!(
-            context["project"]["instructions"].as_str(),
-            Some("Use TDD")
+            context["directory"]["path"].as_str(),
+            Some("/Users/test/my-project")
         );
-        assert_eq!(context["directory"]["path"].as_str(), Some("/Users/test/my-project"));
     }
 
     /// Helper to extract text content from MCP tool response
@@ -505,15 +505,17 @@ mod errors {
 
         let response = client.call_tool("get_feature", json!({ "feature_id": "not-a-uuid" }));
 
-        assert!(response.error.is_some() || {
-            // Some implementations return error in result
-            response
-                .result
-                .as_ref()
-                .and_then(|r| r.get("isError"))
-                .and_then(|e| e.as_bool())
-                .unwrap_or(false)
-        });
+        assert!(
+            response.error.is_some() || {
+                // Some implementations return error in result
+                response
+                    .result
+                    .as_ref()
+                    .and_then(|r| r.get("isError"))
+                    .and_then(|e| e.as_bool())
+                    .unwrap_or(false)
+            }
+        );
     }
 
     #[test]
@@ -524,13 +526,15 @@ mod errors {
         // create_project requires 'name'
         let response = client.call_tool("create_project", json!({}));
 
-        assert!(response.error.is_some() || {
-            response
-                .result
-                .as_ref()
-                .and_then(|r| r.get("isError"))
-                .and_then(|e| e.as_bool())
-                .unwrap_or(false)
-        });
+        assert!(
+            response.error.is_some() || {
+                response
+                    .result
+                    .as_ref()
+                    .and_then(|r| r.get("isError"))
+                    .and_then(|e| e.as_bool())
+                    .unwrap_or(false)
+            }
+        );
     }
 }
