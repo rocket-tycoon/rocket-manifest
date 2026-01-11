@@ -1104,6 +1104,16 @@ impl McpServer {
 impl ServerHandler for McpServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
+            server_info: rmcp::model::Implementation {
+                name: "rocket-manifest".into(),
+                version: env!("CARGO_PKG_VERSION").into(),
+                title: None,
+                icons: None,
+                website_url: None,
+            },
+            capabilities: rmcp::model::ServerCapabilities::builder()
+                .enable_tools()
+                .build(),
             instructions: Some(
                 r#"RocketManifest manages feature implementation sessions and tasks.
 

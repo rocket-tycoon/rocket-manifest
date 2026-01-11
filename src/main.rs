@@ -31,17 +31,34 @@ enum Commands {
     Stop,
 }
 
+/// Initialize tracing with output to stderr (for MCP mode) or stdout
+fn init_tracing(use_stderr: bool) {
+    let filter = tracing_subscriber::EnvFilter::new(
+        std::env::var("RUST_LOG")
+            .unwrap_or_else(|_| "rocket_manifest=debug,tower_http=debug".into()),
+    );
+
+    if use_stderr {
+        // MCP mode: log to stderr so stdout is clean for protocol
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr))
+            .init();
+    } else {
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+    }
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::new(
-            std::env::var("RUST_LOG")
-                .unwrap_or_else(|_| "rocket_manifest=debug,tower_http=debug".into()),
-        ))
-        .with(tracing_subscriber::fmt::layer())
-        .init();
-
     let cli = Cli::parse();
+
+    // MCP mode needs stderr for logging since stdout is the protocol channel
+    let use_stderr = matches!(cli.command, Some(Commands::Mcp));
+    init_tracing(use_stderr);
 
     match cli.command {
         Some(Commands::Serve { port, daemon: _ }) => {

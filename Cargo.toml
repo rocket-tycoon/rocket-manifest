@@ -1,6 +1,6 @@
 [package]
 name = "rocket-manifest"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Living feature documentation server for AI-assisted development"
 license = "BUSL-1.1"
@@ -48,3 +48,4 @@ directories = "6"
 tokio-test = "0.4"
 speculate2 = "0.2"
 axum-test = "17"
+tempfile = "3"
