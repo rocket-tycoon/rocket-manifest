@@ -29,11 +29,6 @@ pub struct FeatureHistory {
 pub struct HistoryDetails {
     /// Summary of the work done.
     pub summary: String,
-    /// Who did the work (agent type or human name).
-    pub author: String,
-    /// Files that were changed during this work.
-    #[serde(default)]
-    pub files_changed: Vec<String>,
     /// Git commits created during this work.
     #[serde(default)]
     pub commits: Vec<CommitRef>,

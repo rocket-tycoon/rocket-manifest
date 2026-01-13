@@ -748,8 +748,6 @@ impl Database {
             session_id: Some(id),
             details: HistoryDetails {
                 summary: input.summary,
-                author: input.author,
-                files_changed: input.files_changed,
                 commits: input.commits,
             },
         })?;
@@ -985,7 +983,7 @@ impl Database {
 
         let details_json = serde_json::to_string(&input.details)?;
 
-        // Write to both old columns (for backwards compat) and new details column
+        // Note: files_changed and author columns are deprecated but kept for schema compatibility
         conn.execute(
             "INSERT INTO feature_history (id, feature_id, session_id, summary, files_changed, author, details, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -994,8 +992,8 @@ impl Database {
                 input.feature_id.to_string(),
                 input.session_id.map(|u| u.to_string()),
                 &input.details.summary,
-                serde_json::to_string(&input.details.files_changed)?,
-                &input.details.author,
+                "[]", // deprecated
+                "",   // deprecated
                 &details_json,
                 now.to_rfc3339(),
             ),

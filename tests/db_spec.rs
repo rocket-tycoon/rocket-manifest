@@ -727,8 +727,6 @@ speculate! {
             it "returns None for non-existent session" {
                 let result = db.complete_session(Uuid::new_v4(), CompleteSessionInput {
                     summary: "Done".to_string(),
-                    author: "test".to_string(),
-                    files_changed: vec![],
                     commits: vec![],
                     feature_state: None,
                 }).expect("Query failed");
@@ -760,8 +758,6 @@ speculate! {
 
                 let result = db.complete_session(session_response.session.id, CompleteSessionInput {
                     summary: "Implemented the feature".to_string(),
-                    author: "claude".to_string(),
-                    files_changed: vec![],
                     commits: vec![],
                     feature_state: None,
                 }).expect("Query failed").expect("Session not found");
@@ -798,8 +794,6 @@ speculate! {
 
                 db.complete_session(session_response.session.id, CompleteSessionInput {
                     summary: "Done".to_string(),
-                    author: "test".to_string(),
-                    files_changed: vec![],
                     commits: vec![],
                     feature_state: None,
                 }).expect("Failed to complete");
@@ -828,8 +822,6 @@ speculate! {
 
                 db.complete_session(session_response.session.id, CompleteSessionInput {
                     summary: "First completion".to_string(),
-                    author: "test".to_string(),
-                    files_changed: vec![],
                     commits: vec![],
                     feature_state: None,
                 }).expect("Failed to complete");
@@ -837,8 +829,6 @@ speculate! {
                 // Try to complete again
                 let result = db.complete_session(session_response.session.id, CompleteSessionInput {
                     summary: "Second completion".to_string(),
-                    author: "test".to_string(),
-                    files_changed: vec![],
                     commits: vec![],
                     feature_state: None,
                 });
@@ -876,8 +866,6 @@ speculate! {
                 // Complete session with mark_implemented (default behavior)
                 db.complete_session(session_response.session.id, CompleteSessionInput {
                     summary: "Implemented".to_string(),
-                    author: "test".to_string(),
-                    files_changed: vec![],
                     commits: vec![],
                     feature_state: Some(FeatureState::Implemented),
                 }).expect("Failed to complete");
@@ -910,8 +898,6 @@ speculate! {
                     session_id: Some(session_id),
                     details: HistoryDetails {
                         summary: "Implemented login flow".to_string(),
-                        author: "claude".to_string(),
-                        files_changed: vec!["src/auth.rs".to_string(), "src/routes.rs".to_string()],
                         commits: vec![],
                     },
                 }).expect("Failed to create history entry");
@@ -919,8 +905,6 @@ speculate! {
                 assert_eq!(entry.feature_id, feature.id);
                 assert_eq!(entry.session_id, Some(session_id));
                 assert_eq!(entry.details.summary, "Implemented login flow");
-                assert_eq!(entry.details.files_changed.len(), 2);
-                assert_eq!(entry.details.author, "claude");
             }
 
             it "creates entry without session_id" {
@@ -939,14 +923,11 @@ speculate! {
                     session_id: None,
                     details: HistoryDetails {
                         summary: "Manual update".to_string(),
-                        author: "human".to_string(),
-                        files_changed: vec![],
                         commits: vec![],
                     },
                 }).expect("Failed to create history entry");
 
                 assert!(entry.session_id.is_none());
-                assert!(entry.details.files_changed.is_empty());
             }
         }
 
@@ -982,8 +963,6 @@ speculate! {
                     session_id: None,
                     details: HistoryDetails {
                         summary: "First change".to_string(),
-                        author: "dev1".to_string(),
-                        files_changed: vec![],
                         commits: vec![],
                     },
                 }).expect("Failed to create");
@@ -993,8 +972,6 @@ speculate! {
                     session_id: None,
                     details: HistoryDetails {
                         summary: "Second change".to_string(),
-                        author: "dev2".to_string(),
-                        files_changed: vec![],
                         commits: vec![],
                     },
                 }).expect("Failed to create");
@@ -1031,8 +1008,6 @@ speculate! {
                     session_id: None,
                     details: HistoryDetails {
                         summary: "Change to feature 1".to_string(),
-                        author: "dev".to_string(),
-                        files_changed: vec![],
                         commits: vec![],
                     },
                 }).expect("Failed to create");
@@ -1042,8 +1017,6 @@ speculate! {
                     session_id: None,
                     details: HistoryDetails {
                         summary: "Change to feature 2".to_string(),
-                        author: "dev".to_string(),
-                        files_changed: vec![],
                         commits: vec![],
                     },
                 }).expect("Failed to create");
@@ -1072,8 +1045,6 @@ speculate! {
                     session_id: None,
                     details: HistoryDetails {
                         summary: "Some work".to_string(),
-                        author: "dev".to_string(),
-                        files_changed: vec![],
                         commits: vec![],
                     },
                 }).expect("Failed to create");

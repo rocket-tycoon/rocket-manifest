@@ -115,12 +115,6 @@ pub struct SessionFeatureSummary {
 pub struct CompleteSessionInput {
     /// Summary of work done, becomes the history entry description.
     pub summary: String,
-    /// Who did the work (agent type or human name). Defaults to "session".
-    #[serde(default = "default_author")]
-    pub author: String,
-    /// Files that were changed during this session.
-    #[serde(default)]
-    pub files_changed: Vec<String>,
     /// Git commits created during this session.
     #[serde(default)]
     pub commits: Vec<CommitRef>,
@@ -128,10 +122,6 @@ pub struct CompleteSessionInput {
     /// If not provided, the feature state is not changed.
     #[serde(default)]
     pub feature_state: Option<FeatureState>,
-}
-
-fn default_author() -> String {
-    "session".to_string()
 }
 
 /// Result of completing a session.

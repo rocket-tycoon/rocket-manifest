@@ -510,8 +510,6 @@ mod session_completion {
             .post(&format!("/api/v1/sessions/{}/complete", session.session.id))
             .json(&CompleteSessionInput {
                 summary: "Feature implemented".to_string(),
-                author: "test".to_string(),
-                files_changed: vec![],
                 commits: vec![],
                 feature_state: None,
             })
@@ -556,8 +554,6 @@ mod session_completion {
             .post(&format!("/api/v1/sessions/{}/complete", session.session.id))
             .json(&CompleteSessionInput {
                 summary: "Work completed".to_string(),
-                author: "test".to_string(),
-                files_changed: vec![],
                 commits: vec![],
                 feature_state: None,
             })
@@ -581,8 +577,6 @@ mod session_completion {
             .post(&format!("/api/v1/sessions/{}/complete", fake_id))
             .json(&CompleteSessionInput {
                 summary: "Done".to_string(),
-                author: "test".to_string(),
-                files_changed: vec![],
                 commits: vec![],
                 feature_state: None,
             })
