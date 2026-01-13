@@ -1722,3 +1722,107 @@ mod feature_sessions {
         assert!(body.contains("leaf"));
     }
 }
+
+// ============================================================
+// Security - API Key Authentication
+// ============================================================
+
+mod security_auth {
+    use super::*;
+    use rocket_manifest::api::{create_router_with_config, SecurityConfig};
+
+    fn setup_with_auth(api_key: &str) -> TestServer {
+        let db = Database::open_memory().expect("Failed to create database");
+        db.migrate().expect("Failed to migrate");
+        let config = SecurityConfig::with_api_key(api_key);
+        let app = create_router_with_config(db, config);
+        TestServer::new(app).expect("Failed to create test server")
+    }
+
+    #[tokio::test]
+    async fn health_endpoint_is_accessible_without_auth() {
+        let server = setup_with_auth("test-secret-key");
+
+        let response = server.get("/api/v1/health").await;
+
+        response.assert_status_ok();
+    }
+
+    #[tokio::test]
+    async fn protected_endpoint_requires_auth() {
+        let server = setup_with_auth("test-secret-key");
+
+        let response = server.get("/api/v1/projects").await;
+
+        response.assert_status(StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn protected_endpoint_accepts_valid_bearer_token() {
+        let server = setup_with_auth("test-secret-key");
+
+        let response = server
+            .get("/api/v1/projects")
+            .add_header("Authorization", "Bearer test-secret-key")
+            .await;
+
+        response.assert_status_ok();
+    }
+
+    #[tokio::test]
+    async fn protected_endpoint_rejects_invalid_bearer_token() {
+        let server = setup_with_auth("test-secret-key");
+
+        let response = server
+            .get("/api/v1/projects")
+            .add_header("Authorization", "Bearer wrong-key")
+            .await;
+
+        response.assert_status(StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn protected_endpoint_rejects_malformed_auth_header() {
+        let server = setup_with_auth("test-secret-key");
+
+        let response = server
+            .get("/api/v1/projects")
+            .add_header("Authorization", "Basic dXNlcjpwYXNz")
+            .await;
+
+        response.assert_status(StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn post_endpoint_requires_auth() {
+        let server = setup_with_auth("test-secret-key");
+
+        let response = server
+            .post("/api/v1/projects")
+            .json(&CreateProjectInput {
+                name: "Test".to_string(),
+                description: None,
+                instructions: None,
+            })
+            .await;
+
+        response.assert_status(StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn post_endpoint_works_with_valid_auth() {
+        let server = setup_with_auth("test-secret-key");
+
+        let response = server
+            .post("/api/v1/projects")
+            .add_header("Authorization", "Bearer test-secret-key")
+            .json(&CreateProjectInput {
+                name: "Test".to_string(),
+                description: None,
+                instructions: None,
+            })
+            .await;
+
+        response.assert_status(StatusCode::CREATED);
+    }
+}

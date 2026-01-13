@@ -1,4 +1,5 @@
 mod handlers;
+mod middleware;
 
 use axum::{
     routing::{delete, get, post, put},
@@ -8,8 +9,40 @@ use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 use crate::db::Database;
 
+pub use middleware::SecurityConfig;
+
+/// Build CORS layer based on configuration
+fn build_cors_layer(config: &SecurityConfig) -> CorsLayer {
+    use axum::http::{header, Method};
+    use tower_http::cors::AllowOrigin;
+
+    if let Some(ref origins) = config.cors_origins {
+        let origins: Vec<_> = origins.iter().filter_map(|s| s.parse().ok()).collect();
+        CorsLayer::new()
+            .allow_origin(AllowOrigin::list(origins))
+            .allow_methods([
+                Method::GET,
+                Method::POST,
+                Method::PUT,
+                Method::DELETE,
+                Method::OPTIONS,
+            ])
+            .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION])
+    } else {
+        CorsLayer::permissive()
+    }
+}
+
 pub fn create_router(db: Database) -> Router {
-    let api = Router::new()
+    create_router_with_config(db, SecurityConfig::from_env())
+}
+
+pub fn create_router_with_config(db: Database, config: SecurityConfig) -> Router {
+    // Health endpoint (unauthenticated)
+    let health_router = Router::new().route("/health", get(handlers::health));
+
+    // Protected API routes
+    let protected_api = Router::new()
         // Projects
         .route("/projects", get(handlers::list_projects))
         .route("/projects", post(handlers::create_project))
@@ -65,13 +98,36 @@ pub fn create_router(db: Database) -> Router {
         )
         // Tasks
         .route("/tasks/{id}", get(handlers::get_task))
-        .route("/tasks/{id}", put(handlers::update_task))
-        // Health
-        .route("/health", get(handlers::health));
+        .route("/tasks/{id}", put(handlers::update_task));
+
+    // Apply auth middleware to protected routes if API key is configured
+    let protected_api = if config.api_key.is_some() {
+        protected_api.layer(axum::middleware::from_fn_with_state(
+            config.clone(),
+            middleware::auth_middleware,
+        ))
+    } else {
+        protected_api
+    };
+
+    // Apply rate limiting if configured
+    let protected_api = if let Some(rate_limiter) = config.rate_limiter.clone() {
+        protected_api.layer(axum::middleware::from_fn_with_state(
+            rate_limiter,
+            middleware::rate_limit_middleware,
+        ))
+    } else {
+        protected_api
+    };
+
+    let cors_layer = build_cors_layer(&config);
+
+    // Combine health (unauthenticated) with protected API
+    let api = health_router.merge(protected_api);
 
     Router::new()
         .nest("/api/v1", api)
         .layer(TraceLayer::new_for_http())
-        .layer(CorsLayer::permissive())
+        .layer(cors_layer)
         .with_state(db)
 }
