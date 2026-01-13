@@ -364,6 +364,76 @@ paths:
                 items:
                   $ref: '#/components/schemas/FeatureHistory'
 
+  /features/{id}/diff:
+    parameters:
+      - $ref: '#/components/parameters/FeatureId'
+    get:
+      tags: [Features]
+      summary: Get feature diff
+      description: |
+        Returns the diff between current details and desired details.
+        Use this to see what changes are pending before implementation.
+      operationId: getFeatureDiff
+      responses:
+        '200':
+          description: Diff between current and desired state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeatureDiff'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /features/{id}/sessions:
+    parameters:
+      - $ref: '#/components/parameters/FeatureId'
+    get:
+      tags: [Features]
+      summary: List sessions for a feature
+      description: Returns all sessions (active and completed) for this feature, ordered by creation date (newest first)
+      operationId: listFeatureSessions
+      responses:
+        '200':
+          description: List of sessions for the feature
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Session'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Sessions]
+      summary: Create a session on a feature (RESTful)
+      description: |
+        Creates a work session on a leaf feature. This is a RESTful alternative to
+        `POST /sessions` where the feature ID comes from the URL path instead of the request body.
+        Only leaf features (those without children) can have sessions.
+        Only one active session per feature is allowed.
+      operationId: createFeatureSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFeatureSessionInput'
+      responses:
+        '201':
+          description: Session created with tasks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          description: Feature is not a leaf or already has active session
+          content:
+            application/json:
+              schema:
+                type: string
+
   # ============================================================
   # Sessions
   # ============================================================
@@ -457,6 +527,52 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           description: Session already completed
+          content:
+            application/json:
+              schema:
+                type: string
+
+  /sessions/{id}/tasks:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      tags: [Sessions]
+      summary: List tasks in a session
+      description: Returns all tasks belonging to this session
+      operationId: listSessionTasks
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Sessions]
+      summary: Create a task in a session
+      description: Adds a new task to an active session
+      operationId: createSessionTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskInput'
+      responses:
+        '201':
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          description: Session is not active
           content:
             application/json:
               schema:
@@ -697,7 +813,7 @@ components:
     # ============================================================
     Feature:
       type: object
-      required: [id, project_id, title, state, created_at, updated_at]
+      required: [id, project_id, title, state, priority, created_at, updated_at]
       properties:
         id:
           type: string
@@ -716,9 +832,17 @@ components:
         details:
           type: string
           nullable: true
-          description: Feature specification including user stories, implementation notes, and technical context
+          description: Current feature specification (what the feature IS)
+        desired_details:
+          type: string
+          nullable: true
+          description: Desired feature specification (what the feature SHOULD be). Non-null indicates pending changes.
         state:
           $ref: '#/components/schemas/FeatureState'
+        priority:
+          type: integer
+          default: 0
+          description: Priority for ordering within parent (lower values first)
         created_at:
           type: string
           format: date-time
@@ -760,9 +884,16 @@ components:
         details:
           type: string
           nullable: true
-          description: Feature specification including user stories, implementation notes, and technical context
+          description: Current feature specification (what the feature IS)
+        desired_details:
+          type: string
+          nullable: true
+          description: Desired feature specification (what the feature SHOULD be). Set to plan pending changes.
         state:
           $ref: '#/components/schemas/FeatureState'
+        priority:
+          type: integer
+          description: Priority for ordering within parent
 
     FeatureTreeNode:
       type: object
@@ -810,6 +941,25 @@ components:
           type: string
           format: date-time
 
+    FeatureDiff:
+      type: object
+      required: [has_changes]
+      description: |
+        Diff between current and desired feature details.
+        Use this to see pending changes before implementation.
+      properties:
+        has_changes:
+          type: boolean
+          description: Whether there are pending changes (desired_details differs from details)
+        current:
+          type: string
+          nullable: true
+          description: Current details (what the feature IS)
+        desired:
+          type: string
+          nullable: true
+          description: Desired details (what the feature SHOULD be)
+
     # ============================================================
     # Session schemas
     # ============================================================
@@ -851,6 +1001,21 @@ components:
           type: string
         tasks:
           type: array
+          items:
+            $ref: '#/components/schemas/CreateTaskInput'
+
+    CreateFeatureSessionInput:
+      type: object
+      description: Input for creating a session via RESTful endpoint (feature_id comes from URL path)
+      required: [goal]
+      properties:
+        goal:
+          type: string
+          description: High-level objective for this work session
+        tasks:
+          type: array
+          description: Initial tasks to create with the session
+          default: []
           items:
             $ref: '#/components/schemas/CreateTaskInput'
 

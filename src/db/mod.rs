@@ -291,7 +291,7 @@ impl Database {
     pub fn get_all_features(&self) -> Result<Vec<Feature>> {
         let conn = self.conn.lock().expect("database lock poisoned");
         let mut stmt = conn.prepare(
-            "SELECT id, project_id, parent_id, title, details, state, priority, created_at, updated_at
+            "SELECT id, project_id, parent_id, title, details, desired_details, state, priority, created_at, updated_at
              FROM features ORDER BY priority, title",
         )?;
 
@@ -303,11 +303,12 @@ impl Database {
                     parent_id: row.get::<_, Option<String>>(2)?.map(parse_uuid),
                     title: row.get(3)?,
                     details: row.get(4)?,
-                    state: FeatureState::from_str(&row.get::<_, String>(5)?)
+                    desired_details: row.get(5)?,
+                    state: FeatureState::from_str(&row.get::<_, String>(6)?)
                         .unwrap_or(FeatureState::Proposed),
-                    priority: row.get(6)?,
-                    created_at: parse_datetime(row.get::<_, String>(7)?),
-                    updated_at: parse_datetime(row.get::<_, String>(8)?),
+                    priority: row.get(7)?,
+                    created_at: parse_datetime(row.get::<_, String>(8)?),
+                    updated_at: parse_datetime(row.get::<_, String>(9)?),
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -318,7 +319,7 @@ impl Database {
     pub fn get_features_by_project(&self, project_id: Uuid) -> Result<Vec<Feature>> {
         let conn = self.conn.lock().expect("database lock poisoned");
         let mut stmt = conn.prepare(
-            "SELECT id, project_id, parent_id, title, details, state, priority, created_at, updated_at
+            "SELECT id, project_id, parent_id, title, details, desired_details, state, priority, created_at, updated_at
              FROM features WHERE project_id = ? ORDER BY priority, title",
         )?;
 
@@ -330,11 +331,12 @@ impl Database {
                     parent_id: row.get::<_, Option<String>>(2)?.map(parse_uuid),
                     title: row.get(3)?,
                     details: row.get(4)?,
-                    state: FeatureState::from_str(&row.get::<_, String>(5)?)
+                    desired_details: row.get(5)?,
+                    state: FeatureState::from_str(&row.get::<_, String>(6)?)
                         .unwrap_or(FeatureState::Proposed),
-                    priority: row.get(6)?,
-                    created_at: parse_datetime(row.get::<_, String>(7)?),
-                    updated_at: parse_datetime(row.get::<_, String>(8)?),
+                    priority: row.get(7)?,
+                    created_at: parse_datetime(row.get::<_, String>(8)?),
+                    updated_at: parse_datetime(row.get::<_, String>(9)?),
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -345,7 +347,7 @@ impl Database {
     pub fn get_feature(&self, id: Uuid) -> Result<Option<Feature>> {
         let conn = self.conn.lock().expect("database lock poisoned");
         let mut stmt = conn.prepare(
-            "SELECT id, project_id, parent_id, title, details, state, priority, created_at, updated_at
+            "SELECT id, project_id, parent_id, title, details, desired_details, state, priority, created_at, updated_at
              FROM features WHERE id = ?",
         )?;
 
@@ -357,15 +359,33 @@ impl Database {
                 parent_id: row.get::<_, Option<String>>(2)?.map(parse_uuid),
                 title: row.get(3)?,
                 details: row.get(4)?,
-                state: FeatureState::from_str(&row.get::<_, String>(5)?)
+                desired_details: row.get(5)?,
+                state: FeatureState::from_str(&row.get::<_, String>(6)?)
                     .unwrap_or(FeatureState::Proposed),
-                priority: row.get(6)?,
-                created_at: parse_datetime(row.get::<_, String>(7)?),
-                updated_at: parse_datetime(row.get::<_, String>(8)?),
+                priority: row.get(7)?,
+                created_at: parse_datetime(row.get::<_, String>(8)?),
+                updated_at: parse_datetime(row.get::<_, String>(9)?),
             }))
         } else {
             Ok(None)
         }
+    }
+
+    /// Get the diff between current and desired details for a feature.
+    pub fn get_feature_diff(&self, id: Uuid) -> Result<Option<FeatureDiff>> {
+        let feature = match self.get_feature(id)? {
+            Some(f) => f,
+            None => return Ok(None),
+        };
+
+        let has_changes =
+            feature.desired_details.is_some() && feature.desired_details != feature.details;
+
+        Ok(Some(FeatureDiff {
+            has_changes,
+            current: feature.details,
+            desired: feature.desired_details,
+        }))
     }
 
     pub fn create_feature(&self, project_id: Uuid, input: CreateFeatureInput) -> Result<Feature> {
@@ -401,6 +421,7 @@ impl Database {
             parent_id: input.parent_id,
             title: input.title,
             details: input.details,
+            desired_details: None,
             state,
             priority,
             created_at: now,
@@ -417,16 +438,18 @@ impl Database {
         let now = Utc::now();
         let title = input.title.unwrap_or(existing.title);
         let details = input.details.or(existing.details);
+        let desired_details = input.desired_details.or(existing.desired_details);
         let state = input.state.unwrap_or(existing.state);
         let parent_id = input.parent_id.or(existing.parent_id);
         let priority = input.priority.unwrap_or(existing.priority);
 
         conn.execute(
-            "UPDATE features SET parent_id = ?, title = ?, details = ?, state = ?, priority = ?, updated_at = ? WHERE id = ?",
+            "UPDATE features SET parent_id = ?, title = ?, details = ?, desired_details = ?, state = ?, priority = ?, updated_at = ? WHERE id = ?",
             (
                 parent_id.map(|u| u.to_string()),
                 &title,
                 &details,
+                &desired_details,
                 state.as_str(),
                 priority,
                 now.to_rfc3339(),
@@ -440,6 +463,7 @@ impl Database {
             parent_id,
             title,
             details,
+            desired_details,
             state,
             priority,
             created_at: existing.created_at,
@@ -456,7 +480,7 @@ impl Database {
     pub fn get_root_features(&self, project_id: Uuid) -> Result<Vec<Feature>> {
         let conn = self.conn.lock().expect("database lock poisoned");
         let mut stmt = conn.prepare(
-            "SELECT id, project_id, parent_id, title, details, state, priority, created_at, updated_at
+            "SELECT id, project_id, parent_id, title, details, desired_details, state, priority, created_at, updated_at
              FROM features WHERE project_id = ? AND parent_id IS NULL ORDER BY priority, title",
         )?;
 
@@ -468,11 +492,12 @@ impl Database {
                     parent_id: None,
                     title: row.get(3)?,
                     details: row.get(4)?,
-                    state: FeatureState::from_str(&row.get::<_, String>(5)?)
+                    desired_details: row.get(5)?,
+                    state: FeatureState::from_str(&row.get::<_, String>(6)?)
                         .unwrap_or(FeatureState::Proposed),
-                    priority: row.get(6)?,
-                    created_at: parse_datetime(row.get::<_, String>(7)?),
-                    updated_at: parse_datetime(row.get::<_, String>(8)?),
+                    priority: row.get(7)?,
+                    created_at: parse_datetime(row.get::<_, String>(8)?),
+                    updated_at: parse_datetime(row.get::<_, String>(9)?),
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -483,7 +508,7 @@ impl Database {
     pub fn get_children(&self, parent_id: Uuid) -> Result<Vec<Feature>> {
         let conn = self.conn.lock().expect("database lock poisoned");
         let mut stmt = conn.prepare(
-            "SELECT id, project_id, parent_id, title, details, state, priority, created_at, updated_at
+            "SELECT id, project_id, parent_id, title, details, desired_details, state, priority, created_at, updated_at
              FROM features WHERE parent_id = ? ORDER BY priority, title",
         )?;
 
@@ -495,11 +520,12 @@ impl Database {
                     parent_id: row.get::<_, Option<String>>(2)?.map(parse_uuid),
                     title: row.get(3)?,
                     details: row.get(4)?,
-                    state: FeatureState::from_str(&row.get::<_, String>(5)?)
+                    desired_details: row.get(5)?,
+                    state: FeatureState::from_str(&row.get::<_, String>(6)?)
                         .unwrap_or(FeatureState::Proposed),
-                    priority: row.get(6)?,
-                    created_at: parse_datetime(row.get::<_, String>(7)?),
-                    updated_at: parse_datetime(row.get::<_, String>(8)?),
+                    priority: row.get(7)?,
+                    created_at: parse_datetime(row.get::<_, String>(8)?),
+                    updated_at: parse_datetime(row.get::<_, String>(9)?),
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -577,6 +603,33 @@ impl Database {
         } else {
             Ok(None)
         }
+    }
+
+    /// Get all sessions for a feature.
+    pub fn get_sessions_by_feature(&self, feature_id: Uuid) -> Result<Vec<Session>> {
+        let conn = self.conn.lock().expect("database lock poisoned");
+        let mut stmt = conn.prepare(
+            "SELECT id, feature_id, goal, status, created_at, completed_at
+             FROM sessions WHERE feature_id = ? ORDER BY created_at DESC",
+        )?;
+
+        let rows = stmt.query_map([feature_id.to_string()], |row| {
+            Ok(Session {
+                id: parse_uuid(row.get::<_, String>(0)?),
+                feature_id: parse_uuid(row.get::<_, String>(1)?),
+                goal: row.get(2)?,
+                status: SessionStatus::from_str(&row.get::<_, String>(3)?)
+                    .unwrap_or(SessionStatus::Active),
+                created_at: parse_datetime(row.get::<_, String>(4)?),
+                completed_at: row.get::<_, Option<String>>(5)?.map(parse_datetime),
+            })
+        })?;
+
+        let mut sessions = Vec::new();
+        for row in rows {
+            sessions.push(row?);
+        }
+        Ok(sessions)
     }
 
     pub fn create_session(&self, input: CreateSessionInput) -> Result<SessionResponse> {
@@ -708,15 +761,33 @@ impl Database {
         )?;
 
         // Update feature state if provided
+        // When marking as implemented, also promote desired_details → details
         if let Some(state) = input.feature_state {
-            conn.execute(
-                "UPDATE features SET state = ?, updated_at = ? WHERE id = ?",
-                (
-                    state.as_str(),
-                    now.to_rfc3339(),
-                    session.feature_id.to_string(),
-                ),
-            )?;
+            if state == FeatureState::Implemented {
+                // Promote desired_details to details and clear desired_details
+                conn.execute(
+                    "UPDATE features SET
+                        state = ?,
+                        details = COALESCE(desired_details, details),
+                        desired_details = NULL,
+                        updated_at = ?
+                    WHERE id = ?",
+                    (
+                        state.as_str(),
+                        now.to_rfc3339(),
+                        session.feature_id.to_string(),
+                    ),
+                )?;
+            } else {
+                conn.execute(
+                    "UPDATE features SET state = ?, updated_at = ? WHERE id = ?",
+                    (
+                        state.as_str(),
+                        now.to_rfc3339(),
+                        session.feature_id.to_string(),
+                    ),
+                )?;
+            }
         }
 
         let completed_session = Session {

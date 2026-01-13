@@ -259,9 +259,9 @@ speculate! {
                 let input = UpdateFeatureInput {
                     parent_id: None,
                     title: Some("New Title".to_string()),
-
                     details: None,
-                priority: None,
+                    desired_details: None,
+                    priority: None,
                     state: None,
                 };
 
@@ -283,9 +283,9 @@ speculate! {
                 let updated = db.update_feature(created.id, UpdateFeatureInput {
                     parent_id: None,
                     title: Some("Updated Title".to_string()),
-
                     details: None,
-                priority: None,
+                    desired_details: None,
+                    priority: None,
                     state: None,
                 }).expect("Query failed").expect("Feature not found");
 
@@ -307,9 +307,9 @@ speculate! {
                 let updated = db.update_feature(created.id, UpdateFeatureInput {
                     parent_id: None,
                     title: None,
-
                     details: None,
-                priority: None,
+                    desired_details: None,
+                    priority: None,
                     state: Some(FeatureState::Implemented),
                 }).expect("Query failed").expect("Feature not found");
 
@@ -340,6 +340,80 @@ speculate! {
                 let found = db.get_feature(created.id).expect("Query failed");
                 assert!(found.is_none());
             }
+        }
+
+        describe "get_feature_diff" {
+            it "returns has_changes false when no desired_details" {
+                let project = create_test_project(&db);
+                let feature = db.create_feature(project.id, CreateFeatureInput {
+                    parent_id: None,
+                    title: "Feature".to_string(),
+                    details: Some("Current details".to_string()),
+                    priority: None,
+                    state: None,
+                }).expect("Failed to create");
+
+                let diff = db.get_feature_diff(feature.id).expect("Query failed").unwrap();
+                assert!(!diff.has_changes);
+                assert_eq!(diff.current, Some("Current details".to_string()));
+                assert!(diff.desired.is_none());
+            }
+
+            it "returns has_changes true when desired_details differs" {
+                let project = create_test_project(&db);
+                let feature = db.create_feature(project.id, CreateFeatureInput {
+                    parent_id: None,
+                    title: "Feature".to_string(),
+                    details: Some("Current".to_string()),
+                    priority: None,
+                    state: None,
+                }).expect("Failed to create");
+
+                db.update_feature(feature.id, UpdateFeatureInput {
+                    parent_id: None,
+                    title: None,
+                    details: None,
+                    desired_details: Some("Desired".to_string()),
+                    priority: None,
+                    state: None,
+                }).expect("Failed to update");
+
+                let diff = db.get_feature_diff(feature.id).expect("Query failed").unwrap();
+                assert!(diff.has_changes);
+                assert_eq!(diff.current, Some("Current".to_string()));
+                assert_eq!(diff.desired, Some("Desired".to_string()));
+            }
+
+            it "returns None for non-existent feature" {
+                let result = db.get_feature_diff(Uuid::new_v4()).expect("Query failed");
+                assert!(result.is_none());
+            }
+        }
+
+        describe "desired_details" {
+            it "stores and retrieves desired_details" {
+                let project = create_test_project(&db);
+                let feature = db.create_feature(project.id, CreateFeatureInput {
+                    parent_id: None,
+                    title: "Feature".to_string(),
+                    details: Some("Current".to_string()),
+                    priority: None,
+                    state: None,
+                }).expect("Failed to create");
+
+                let updated = db.update_feature(feature.id, UpdateFeatureInput {
+                    parent_id: None,
+                    title: None,
+                    details: None,
+                    desired_details: Some("Desired".to_string()),
+                    priority: None,
+                    state: None,
+                }).expect("Failed to update").unwrap();
+
+                assert_eq!(updated.details, Some("Current".to_string()));
+                assert_eq!(updated.desired_details, Some("Desired".to_string()));
+            }
+
         }
     }
 
@@ -771,6 +845,48 @@ speculate! {
 
                 assert!(result.is_err());
                 assert!(result.unwrap_err().to_string().contains("not active"));
+            }
+
+            it "promotes desired_details to details when marking implemented" {
+                let project = create_test_project(&db);
+                let feature = db.create_feature(project.id, CreateFeatureInput {
+                    parent_id: None,
+                    title: "Feature".to_string(),
+                    details: Some("Original details".to_string()),
+                    priority: None,
+                    state: Some(FeatureState::Specified),
+                }).expect("Failed to create");
+
+                // Set desired_details
+                db.update_feature(feature.id, UpdateFeatureInput {
+                    parent_id: None,
+                    title: None,
+                    details: None,
+                    desired_details: Some("New desired details".to_string()),
+                    priority: None,
+                    state: None,
+                }).expect("Failed to update");
+
+                let session_response = db.create_session(CreateSessionInput {
+                    feature_id: feature.id,
+                    goal: "Implement feature".to_string(),
+                    tasks: vec![],
+                }).expect("Failed to create session");
+
+                // Complete session with mark_implemented (default behavior)
+                db.complete_session(session_response.session.id, CompleteSessionInput {
+                    summary: "Implemented".to_string(),
+                    author: "test".to_string(),
+                    files_changed: vec![],
+                    commits: vec![],
+                    feature_state: Some(FeatureState::Implemented),
+                }).expect("Failed to complete");
+
+                // Check that desired_details was promoted to details
+                let updated_feature = db.get_feature(feature.id).expect("Query failed").unwrap();
+                assert_eq!(updated_feature.details, Some("New desired details".to_string()));
+                assert!(updated_feature.desired_details.is_none());
+                assert_eq!(updated_feature.state, FeatureState::Implemented);
             }
         }
     }

@@ -24,6 +24,9 @@ pub struct Feature {
     /// Feature details including user stories, implementation notes, and technical context.
     /// User stories can be embedded here in "As a... I want... So that..." format.
     pub details: Option<String>,
+    /// Desired details for pending changes. When non-null, indicates edits awaiting implementation.
+    /// Session completion promotes `desired_details` → `details` when `mark_implemented=true`.
+    pub desired_details: Option<String>,
     pub state: FeatureState,
     /// Priority for ordering features within a parent. Lower values appear first.
     /// Use this to indicate implementation order without polluting feature titles.
@@ -93,6 +96,8 @@ pub struct UpdateFeatureInput {
     pub parent_id: Option<Uuid>,
     pub title: Option<String>,
     pub details: Option<String>,
+    /// Desired details for pending changes. Set to implement declarative editing workflow.
+    pub desired_details: Option<String>,
     pub state: Option<FeatureState>,
     /// Update priority for ordering within parent.
     pub priority: Option<i32>,
@@ -107,4 +112,17 @@ pub struct FeatureTreeNode {
     #[serde(flatten)]
     pub feature: Feature,
     pub children: Vec<FeatureTreeNode>,
+}
+
+/// Diff between current and desired feature details.
+///
+/// Used to show pending changes before implementation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FeatureDiff {
+    /// Whether there are pending changes (desired_details differs from details).
+    pub has_changes: bool,
+    /// Current details (what the feature IS).
+    pub current: Option<String>,
+    /// Desired details (what the feature SHOULD be).
+    pub desired: Option<String>,
 }

@@ -48,12 +48,21 @@ pub fn create_router(db: Database) -> Router {
         .route("/features/{id}", put(handlers::update_feature))
         .route("/features/{id}", delete(handlers::delete_feature))
         .route("/features/{id}/children", get(handlers::list_children))
+        .route("/features/{id}/diff", get(handlers::get_feature_diff))
         .route("/features/{id}/history", get(handlers::get_feature_history))
+        .route(
+            "/features/{id}/sessions",
+            get(handlers::list_feature_sessions).post(handlers::create_feature_session),
+        )
         // Sessions
         .route("/sessions", post(handlers::create_session))
         .route("/sessions/{id}", get(handlers::get_session))
         .route("/sessions/{id}/status", get(handlers::get_session_status))
         .route("/sessions/{id}/complete", post(handlers::complete_session))
+        .route(
+            "/sessions/{id}/tasks",
+            get(handlers::list_session_tasks).post(handlers::create_session_task),
+        )
         // Tasks
         .route("/tasks/{id}", get(handlers::get_task))
         .route("/tasks/{id}", put(handlers::update_task))

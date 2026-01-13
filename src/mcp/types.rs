@@ -239,6 +239,8 @@ pub struct FeatureInfo {
     pub title: String,
     /// Feature details including user stories, implementation notes, and technical context.
     pub details: Option<String>,
+    /// Desired details for pending changes. When non-null, indicates edits awaiting implementation.
+    pub desired_details: Option<String>,
     pub state: String,
     /// Priority for ordering within parent. Lower values appear first.
     pub priority: i32,
@@ -312,7 +314,7 @@ pub struct ProposedFeature {
     /// Short capability name (2-5 words). What users can DO.
     pub title: String,
     /// Feature details: user story, technical notes, constraints, acceptance criteria.
-    /// User stories can be in "As a [user], I can [capability] so that [benefit]" format.
+    /// User stories can be in "As a \[user\], I can \[capability\] so that \[benefit\]" format.
     #[serde(default)]
     pub details: Option<String>,
     /// Priority for ordering. Lower values = implement first.

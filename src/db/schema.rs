@@ -38,6 +38,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "remove_story",
         sql: include_str!("migrations/006_remove_story.sql"),
     },
+    Migration {
+        version: "007",
+        name: "desired_details",
+        sql: include_str!("migrations/007_desired_details.sql"),
+    },
 ];
 
 pub fn run_migrations(conn: &Connection) -> Result<()> {
@@ -152,7 +157,10 @@ mod tests {
 
         // Verify all migrations were recorded
         let versions = get_applied_migrations(&conn).unwrap();
-        assert_eq!(versions, vec!["001", "002", "003", "004", "005", "006"]);
+        assert_eq!(
+            versions,
+            vec!["001", "002", "003", "004", "005", "006", "007"]
+        );
     }
 
     #[test]
@@ -162,7 +170,10 @@ mod tests {
         run_migrations(&conn).unwrap(); // Should not fail
 
         let versions = get_applied_migrations(&conn).unwrap();
-        assert_eq!(versions, vec!["001", "002", "003", "004", "005", "006"]);
+        assert_eq!(
+            versions,
+            vec!["001", "002", "003", "004", "005", "006", "007"]
+        );
     }
 
     #[test]
@@ -195,6 +206,9 @@ mod tests {
         run_migrations(&conn).unwrap();
 
         let versions = get_applied_migrations(&conn).unwrap();
-        assert_eq!(versions, vec!["001", "002", "003", "004", "005", "006"]);
+        assert_eq!(
+            versions,
+            vec!["001", "002", "003", "004", "005", "006", "007"]
+        );
     }
 }

@@ -75,6 +75,7 @@ impl McpServer {
                 id: feature.id.to_string(),
                 title: feature.title,
                 details: feature.details,
+                desired_details: feature.desired_details,
                 state: feature.state.as_str().to_string(),
                 priority: feature.priority,
             },
@@ -287,6 +288,7 @@ impl McpServer {
                     id: f.id.to_string(),
                     title: f.title,
                     details: f.details,
+                    desired_details: f.desired_details,
                     state: f.state.as_str().to_string(),
                     priority: f.priority,
                 })
@@ -306,6 +308,7 @@ impl McpServer {
             id: feature.id.to_string(),
             title: feature.title,
             details: feature.details,
+            desired_details: feature.desired_details,
             state: feature.state.as_str().to_string(),
             priority: feature.priority,
         })
@@ -368,6 +371,7 @@ impl McpServer {
                     parent_id: None,
                     title: None,
                     details: None,
+                    desired_details: None,
                     state: Some(new_state),
                     priority: None,
                 },
@@ -379,6 +383,7 @@ impl McpServer {
             id: feature.id.to_string(),
             title: feature.title,
             details: feature.details,
+            desired_details: feature.desired_details,
             state: feature.state.as_str().to_string(),
             priority: feature.priority,
         })
@@ -473,6 +478,7 @@ impl McpServer {
             id: feature.id.to_string(),
             title: feature.title,
             details: feature.details,
+            desired_details: feature.desired_details,
             state: feature.state.as_str().to_string(),
             priority: feature.priority,
         })
@@ -554,6 +560,7 @@ impl McpServer {
                 id: feature.id.to_string(),
                 title: feature.title,
                 details: feature.details,
+                desired_details: feature.desired_details,
                 state: feature.state.as_str().to_string(),
                 priority: feature.priority,
             },
@@ -861,6 +868,7 @@ impl McpServer {
                     id: f.id.to_string(),
                     title: f.title,
                     details: f.details,
+                    desired_details: f.desired_details,
                     state: f.state.as_str().to_string(),
                     priority: f.priority,
                 })
@@ -893,6 +901,7 @@ impl McpServer {
             id: feature.id.to_string(),
             title: feature.title,
             details: feature.details,
+            desired_details: feature.desired_details,
             state: feature.state.as_str().to_string(),
             priority: feature.priority,
         };
@@ -983,6 +992,7 @@ impl McpServer {
                     parent_id: None,
                     title: None,
                     details: None,
+                    desired_details: None,
                     state: Some(new_state),
                     priority: None,
                 },
@@ -994,6 +1004,7 @@ impl McpServer {
             id: feature.id.to_string(),
             title: feature.title,
             details: feature.details,
+            desired_details: feature.desired_details,
             state: feature.state.as_str().to_string(),
             priority: feature.priority,
         };
@@ -1117,6 +1128,7 @@ impl McpServer {
             id: feature.id.to_string(),
             title: feature.title,
             details: feature.details,
+            desired_details: feature.desired_details,
             state: feature.state.as_str().to_string(),
             priority: feature.priority,
         };
