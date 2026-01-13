@@ -713,14 +713,10 @@ components:
         title:
           type: string
           example: "User Authentication"
-        story:
-          type: string
-          nullable: true
-          description: User story or high-level description
         details:
           type: string
           nullable: true
-          description: Implementation details or technical notes
+          description: Feature specification including user stories, implementation notes, and technical context
         state:
           $ref: '#/components/schemas/FeatureState'
         created_at:
@@ -749,12 +745,10 @@ components:
           nullable: true
         title:
           type: string
-        story:
-          type: string
-          nullable: true
         details:
           type: string
           nullable: true
+          description: Feature specification including user stories, implementation notes, and technical context
         state:
           $ref: '#/components/schemas/FeatureState'
 
@@ -763,12 +757,10 @@ components:
       properties:
         title:
           type: string
-        story:
-          type: string
-          nullable: true
         details:
           type: string
           nullable: true
+          description: Feature specification including user stories, implementation notes, and technical context
         state:
           $ref: '#/components/schemas/FeatureState'
 

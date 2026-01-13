@@ -174,10 +174,9 @@ pub struct CreateFeatureRequest {
     pub parent_id: Option<String>,
     #[schemars(description = "Short title for the feature (e.g., 'User Authentication')")]
     pub title: String,
-    #[schemars(description = "Optional user story in 'As a... I want... So that...' format")]
-    #[serde(default)]
-    pub story: Option<String>,
-    #[schemars(description = "Optional implementation details and technical notes")]
+    #[schemars(
+        description = "Optional feature details including user stories, implementation notes, and technical context"
+    )]
     #[serde(default)]
     pub details: Option<String>,
     #[schemars(
@@ -238,7 +237,7 @@ pub struct TaskInfo {
 pub struct FeatureInfo {
     pub id: String,
     pub title: String,
-    pub story: Option<String>,
+    /// Feature details including user stories, implementation notes, and technical context.
     pub details: Option<String>,
     pub state: String,
     /// Priority for ordering within parent. Lower values appear first.
@@ -312,10 +311,8 @@ pub struct PlanFeaturesResponse {
 pub struct ProposedFeature {
     /// Short capability name (2-5 words). What users can DO.
     pub title: String,
-    /// User story: "As a [user], I can [capability] so that [benefit]"
-    #[serde(default)]
-    pub story: Option<String>,
-    /// Technical notes, constraints, acceptance criteria
+    /// Feature details: user story, technical notes, constraints, acceptance criteria.
+    /// User stories can be in "As a [user], I can [capability] so that [benefit]" format.
     #[serde(default)]
     pub details: Option<String>,
     /// Priority for ordering. Lower values = implement first.

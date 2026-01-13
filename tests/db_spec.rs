@@ -96,7 +96,7 @@ speculate! {
                 db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Feature".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -162,7 +162,7 @@ speculate! {
                 let input = CreateFeatureInput {
                     parent_id: None,
                     title: "User Login".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -180,8 +180,7 @@ speculate! {
                 let input = CreateFeatureInput {
                     parent_id: None,
                     title: "OAuth Integration".to_string(),
-                    story: Some("As a user, I want to log in with OAuth".to_string()),
-                    details: Some("## Technical Notes\n\nUse PKCE flow".to_string()),
+                    details: Some("As a user, I want to log in with OAuth.\n\n## Technical Notes\n\nUse PKCE flow".to_string()),
                     state: Some(FeatureState::Specified),
                     priority: None,
                 };
@@ -190,8 +189,8 @@ speculate! {
 
                 assert_eq!(feature.title, "OAuth Integration");
                 assert_eq!(feature.state, FeatureState::Specified);
-                assert_eq!(feature.story, Some("As a user, I want to log in with OAuth".to_string()));
-                assert!(feature.details.unwrap().contains("PKCE"));
+                assert!(feature.details.as_ref().unwrap().contains("As a user"));
+                assert!(feature.details.as_ref().unwrap().contains("PKCE"));
             }
         }
 
@@ -206,7 +205,7 @@ speculate! {
                 let input = CreateFeatureInput {
                     parent_id: None,
                     title: "Rate Limiting".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -232,7 +231,7 @@ speculate! {
                 db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Zebra Feature".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -241,7 +240,7 @@ speculate! {
                 db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Alpha Feature".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -260,7 +259,7 @@ speculate! {
                 let input = UpdateFeatureInput {
                     parent_id: None,
                     title: Some("New Title".to_string()),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -275,7 +274,7 @@ speculate! {
                 let created = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Original Title".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: Some(FeatureState::Proposed),
@@ -284,7 +283,7 @@ speculate! {
                 let updated = db.update_feature(created.id, UpdateFeatureInput {
                     parent_id: None,
                     title: Some("Updated Title".to_string()),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -299,7 +298,7 @@ speculate! {
                 let created = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Feature".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: Some(FeatureState::Proposed),
@@ -308,7 +307,7 @@ speculate! {
                 let updated = db.update_feature(created.id, UpdateFeatureInput {
                     parent_id: None,
                     title: None,
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: Some(FeatureState::Implemented),
@@ -329,7 +328,7 @@ speculate! {
                 let created = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "To Delete".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -351,7 +350,7 @@ speculate! {
                 let parent = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Authentication".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -360,7 +359,7 @@ speculate! {
                 let child = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: Some(parent.id),
                     title: "Login".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -374,7 +373,7 @@ speculate! {
                 let root = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Authentication".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -383,7 +382,7 @@ speculate! {
                 let level1 = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: Some(root.id),
                     title: "OAuth".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -392,7 +391,7 @@ speculate! {
                 let level2 = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: Some(level1.id),
                     title: "Google".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -411,7 +410,7 @@ speculate! {
                 let root1 = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Root 1".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -420,7 +419,7 @@ speculate! {
                 let _root2 = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Root 2".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -429,7 +428,7 @@ speculate! {
                 db.create_feature(project.id, CreateFeatureInput {
                     parent_id: Some(root1.id),
                     title: "Child".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -448,7 +447,7 @@ speculate! {
                 let leaf = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Leaf".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -463,7 +462,7 @@ speculate! {
                 let parent = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Parent".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -472,7 +471,7 @@ speculate! {
                 db.create_feature(project.id, CreateFeatureInput {
                     parent_id: Some(parent.id),
                     title: "Zebra Child".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -481,7 +480,7 @@ speculate! {
                 db.create_feature(project.id, CreateFeatureInput {
                     parent_id: Some(parent.id),
                     title: "Alpha Child".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -499,7 +498,7 @@ speculate! {
                 let parent = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Parent".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -508,7 +507,7 @@ speculate! {
                 let child = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: Some(parent.id),
                     title: "Child".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -517,7 +516,7 @@ speculate! {
                 db.create_feature(project.id, CreateFeatureInput {
                     parent_id: Some(child.id),
                     title: "Grandchild".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -535,7 +534,7 @@ speculate! {
                 let leaf = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Leaf".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -549,7 +548,7 @@ speculate! {
                 let parent = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Parent".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -558,7 +557,7 @@ speculate! {
                 db.create_feature(project.id, CreateFeatureInput {
                     parent_id: Some(parent.id),
                     title: "Child".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -574,7 +573,7 @@ speculate! {
                 let parent = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Parent".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -583,7 +582,7 @@ speculate! {
                 let child = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: Some(parent.id),
                     title: "Child".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -604,7 +603,7 @@ speculate! {
                 let leaf = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Leaf Feature".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -624,7 +623,7 @@ speculate! {
                 let parent = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Parent".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -633,7 +632,7 @@ speculate! {
                 db.create_feature(project.id, CreateFeatureInput {
                     parent_id: Some(parent.id),
                     title: "Child".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -668,7 +667,7 @@ speculate! {
                 let feature = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Feature".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -704,7 +703,7 @@ speculate! {
                 let feature = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Feature".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -741,7 +740,7 @@ speculate! {
                 let feature = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Feature".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -783,7 +782,7 @@ speculate! {
                 let feature = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Test Feature".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -813,7 +812,7 @@ speculate! {
                 let feature = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Manual Feature".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -841,7 +840,7 @@ speculate! {
                 let feature = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "New Feature".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -856,7 +855,7 @@ speculate! {
                 let feature = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Feature".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -896,7 +895,7 @@ speculate! {
                 let feature1 = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Feature 1".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -905,7 +904,7 @@ speculate! {
                 let feature2 = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Feature 2".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,
@@ -946,7 +945,7 @@ speculate! {
                 let feature = db.create_feature(project.id, CreateFeatureInput {
                     parent_id: None,
                     title: "Feature".to_string(),
-                    story: None,
+
                     details: None,
                 priority: None,
                     state: None,

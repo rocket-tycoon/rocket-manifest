@@ -33,8 +33,7 @@ fn create_test_feature(db: &Database, project_id: uuid::Uuid) -> Feature {
         CreateFeatureInput {
             parent_id: None,
             title: "Test Feature".to_string(),
-            story: Some("As a user, I want to test".to_string()),
-            details: Some("Implementation details".to_string()),
+            details: Some("As a user, I want to test. Implementation details".to_string()),
             state: Some(FeatureState::Specified),
             priority: None,
         },
@@ -231,7 +230,7 @@ mod orchestrator_tools {
                 CreateFeatureInput {
                     parent_id: Some(parent.id),
                     title: "Child".to_string(),
-                    story: None,
+
                     details: None,
                     priority: None,
                     state: None,
@@ -477,7 +476,7 @@ mod discovery_tools {
                 CreateFeatureInput {
                     parent_id: None,
                     title: "Second Feature".to_string(),
-                    story: None,
+
                     details: None,
                     priority: None,
                     state: Some(FeatureState::Proposed),
@@ -508,7 +507,7 @@ mod discovery_tools {
                 CreateFeatureInput {
                     parent_id: None,
                     title: "Other Feature".to_string(),
-                    story: None,
+
                     details: None,
                     priority: None,
                     state: None,
@@ -535,7 +534,7 @@ mod discovery_tools {
                 CreateFeatureInput {
                     parent_id: None,
                     title: "Proposed Feature".to_string(),
-                    story: None,
+
                     details: None,
                     priority: None,
                     state: Some(FeatureState::Proposed),
@@ -577,8 +576,8 @@ mod discovery_tools {
             assert_eq!(response.id, feature.id.to_string());
             assert_eq!(response.title, "Test Feature");
             assert_eq!(
-                response.story,
-                Some("As a user, I want to test".to_string())
+                response.details,
+                Some("As a user, I want to test. Implementation details".to_string())
             );
         }
 
@@ -865,20 +864,15 @@ mod setup_tools {
                     &project.id.to_string(),
                     None,
                     "User Authentication",
-                    Some("As a user, I want to log in so that I can access my data"),
-                    Some("Use JWT tokens, 24h expiry"),
+                    Some("As a user, I want to log in so that I can access my data. Use JWT tokens, 24h expiry"),
                     "specified",
                 )
                 .expect("Tool failed");
 
             assert_eq!(response.title, "User Authentication");
             assert_eq!(
-                response.story,
-                Some("As a user, I want to log in so that I can access my data".to_string())
-            );
-            assert_eq!(
                 response.details,
-                Some("Use JWT tokens, 24h expiry".to_string())
+                Some("As a user, I want to log in so that I can access my data. Use JWT tokens, 24h expiry".to_string())
             );
             assert_eq!(response.state, "specified");
 
@@ -901,13 +895,11 @@ mod setup_tools {
                     None,
                     "Simple Feature",
                     None,
-                    None,
                     "proposed",
                 )
                 .expect("Tool failed");
 
             assert_eq!(response.title, "Simple Feature");
-            assert!(response.story.is_none());
             assert!(response.details.is_none());
             assert_eq!(response.state, "proposed");
         }
@@ -924,7 +916,6 @@ mod setup_tools {
                     None,
                     "Authentication",
                     None,
-                    None,
                     "proposed",
                 )
                 .expect("Tool failed");
@@ -935,7 +926,6 @@ mod setup_tools {
                     &project.id.to_string(),
                     Some(&parent.id),
                     "OAuth Login",
-                    None,
                     None,
                     "proposed",
                 )
@@ -962,7 +952,6 @@ mod setup_tools {
                 None,
                 "Feature",
                 None,
-                None,
                 "invalid_state",
             );
 
@@ -977,7 +966,6 @@ mod setup_tools {
                 &uuid::Uuid::new_v4().to_string(),
                 None,
                 "Feature",
-                None,
                 None,
                 "proposed",
             );
@@ -996,8 +984,7 @@ mod setup_tools {
                     &project.id.to_string(),
                     None,
                     "Implementable Feature",
-                    Some("User story here"),
-                    Some("Details here"),
+                    Some("User story here. Details here"),
                     "specified",
                 )
                 .expect("Tool failed");
@@ -1022,8 +1009,7 @@ mod setup_tools {
 
             let features = vec![ProposedFeature {
                 title: "User Authentication".to_string(),
-                story: Some("As a user, I can log in".to_string()),
-                details: None,
+                details: Some("As a user, I can log in".to_string()),
                 priority: 0,
                 children: vec![],
             }];
@@ -1051,8 +1037,9 @@ mod setup_tools {
 
             let features = vec![ProposedFeature {
                 title: "Todo Management".to_string(),
-                story: Some("As a user, I can manage my todos".to_string()),
-                details: Some("CRUD operations for todos".to_string()),
+                details: Some(
+                    "As a user, I can manage my todos. CRUD operations for todos".to_string(),
+                ),
                 priority: 0,
                 children: vec![],
             }];
@@ -1070,8 +1057,8 @@ mod setup_tools {
             let feature = db.get_feature(feature_id).expect("Query failed").unwrap();
             assert_eq!(feature.title, "Todo Management");
             assert_eq!(
-                feature.story,
-                Some("As a user, I can manage my todos".to_string())
+                feature.details,
+                Some("As a user, I can manage my todos. CRUD operations for todos".to_string())
             );
             assert_eq!(feature.state, FeatureState::Specified);
         }
@@ -1083,21 +1070,18 @@ mod setup_tools {
 
             let features = vec![ProposedFeature {
                 title: "Authentication".to_string(),
-                story: None,
                 details: None,
                 priority: 0,
                 children: vec![
                     ProposedFeature {
                         title: "Password Login".to_string(),
-                        story: Some("As a user, I can log in with password".to_string()),
-                        details: None,
+                        details: Some("As a user, I can log in with password".to_string()),
                         priority: 0,
                         children: vec![],
                     },
                     ProposedFeature {
                         title: "OAuth".to_string(),
-                        story: Some("As a user, I can log in with OAuth".to_string()),
-                        details: None,
+                        details: Some("As a user, I can log in with OAuth".to_string()),
                         priority: 1,
                         children: vec![],
                     },
@@ -1128,14 +1112,14 @@ mod setup_tools {
             let features = vec![
                 ProposedFeature {
                     title: "Authentication".to_string(),
-                    story: None,
+
                     details: None,
                     priority: 0,
                     children: vec![],
                 },
                 ProposedFeature {
                     title: "Todo Management".to_string(),
-                    story: None,
+
                     details: None,
                     priority: 1,
                     children: vec![],
@@ -1159,7 +1143,7 @@ mod setup_tools {
 
             let features = vec![ProposedFeature {
                 title: "Feature".to_string(),
-                story: None,
+
                 details: None,
                 priority: 0,
                 children: vec![],
@@ -1178,7 +1162,7 @@ mod setup_tools {
 
             let features = vec![ProposedFeature {
                 title: "Feature".to_string(),
-                story: None,
+
                 details: None,
                 priority: 42,
                 children: vec![],

@@ -21,7 +21,8 @@ pub struct Feature {
     pub project_id: Uuid,
     pub parent_id: Option<Uuid>,
     pub title: String,
-    pub story: Option<String>,
+    /// Feature details including user stories, implementation notes, and technical context.
+    /// User stories can be embedded here in "As a... I want... So that..." format.
     pub details: Option<String>,
     pub state: FeatureState,
     /// Priority for ordering features within a parent. Lower values appear first.
@@ -77,9 +78,7 @@ pub struct CreateFeatureInput {
     /// Parent feature ID for nesting. `None` creates a root feature.
     pub parent_id: Option<Uuid>,
     pub title: String,
-    /// User story in "As a... I want... So that..." format.
-    pub story: Option<String>,
-    /// Technical details, constraints, or additional context.
+    /// Feature details including user stories, implementation notes, and technical context.
     pub details: Option<String>,
     /// Initial state. Defaults to `Proposed` if not specified.
     pub state: Option<FeatureState>,
@@ -93,7 +92,6 @@ pub struct UpdateFeatureInput {
     /// Move feature under a different parent.
     pub parent_id: Option<Uuid>,
     pub title: Option<String>,
-    pub story: Option<String>,
     pub details: Option<String>,
     pub state: Option<FeatureState>,
     /// Update priority for ordering within parent.
