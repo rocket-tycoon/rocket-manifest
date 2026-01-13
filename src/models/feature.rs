@@ -126,3 +126,39 @@ pub struct FeatureDiff {
     /// Desired details (what the feature SHOULD be).
     pub desired: Option<String>,
 }
+
+/// Lightweight feature summary without details (used for list operations).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FeatureSummary {
+    pub id: Uuid,
+    pub project_id: Uuid,
+    pub parent_id: Option<Uuid>,
+    pub title: String,
+    pub state: FeatureState,
+    pub priority: i32,
+}
+
+impl From<Feature> for FeatureSummary {
+    fn from(f: Feature) -> Self {
+        Self {
+            id: f.id,
+            project_id: f.project_id,
+            parent_id: f.parent_id,
+            title: f.title,
+            state: f.state,
+            priority: f.priority,
+        }
+    }
+}
+
+/// Query parameters for listing features.
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct ListFeaturesQuery {
+    /// Include full details in response. Defaults to false (summary mode).
+    #[serde(default)]
+    pub include_details: bool,
+    /// Maximum number of features to return.
+    pub limit: Option<u32>,
+    /// Number of features to skip for pagination.
+    pub offset: Option<u32>,
+}

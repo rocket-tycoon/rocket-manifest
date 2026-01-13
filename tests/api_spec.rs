@@ -880,7 +880,7 @@ mod features {
             })
             .await;
 
-        let response = server.get("/api/v1/features").await;
+        let response = server.get("/api/v1/features?include_details=true").await;
 
         response.assert_status_ok();
         let features: Vec<Feature> = response.json();

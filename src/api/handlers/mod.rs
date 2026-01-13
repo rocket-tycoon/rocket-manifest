@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
     Json,
@@ -135,17 +135,51 @@ pub async fn remove_project_directory(
 
 pub async fn list_features(
     State(db): State<Database>,
-) -> Result<Json<Vec<Feature>>, (StatusCode, String)> {
-    db.get_all_features().map(Json).map_err(internal_error)
+    Query(query): Query<ListFeaturesQuery>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let features = db.get_all_features().map_err(internal_error)?;
+
+    // Apply pagination
+    let offset = query.offset.unwrap_or(0) as usize;
+    let features: Vec<_> = features.into_iter().skip(offset).collect();
+    let features: Vec<_> = match query.limit {
+        Some(limit) => features.into_iter().take(limit as usize).collect(),
+        None => features,
+    };
+
+    // Return summary or full details
+    if query.include_details {
+        Ok(Json(serde_json::to_value(features).unwrap()))
+    } else {
+        let summaries: Vec<FeatureSummary> = features.into_iter().map(Into::into).collect();
+        Ok(Json(serde_json::to_value(summaries).unwrap()))
+    }
 }
 
 pub async fn list_project_features(
     State(db): State<Database>,
     Path(project_id): Path<Uuid>,
-) -> Result<Json<Vec<Feature>>, (StatusCode, String)> {
-    db.get_features_by_project(project_id)
-        .map(Json)
-        .map_err(internal_error)
+    Query(query): Query<ListFeaturesQuery>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let features = db
+        .get_features_by_project(project_id)
+        .map_err(internal_error)?;
+
+    // Apply pagination
+    let offset = query.offset.unwrap_or(0) as usize;
+    let features: Vec<_> = features.into_iter().skip(offset).collect();
+    let features: Vec<_> = match query.limit {
+        Some(limit) => features.into_iter().take(limit as usize).collect(),
+        None => features,
+    };
+
+    // Return summary or full details
+    if query.include_details {
+        Ok(Json(serde_json::to_value(features).unwrap()))
+    } else {
+        let summaries: Vec<FeatureSummary> = features.into_iter().map(Into::into).collect();
+        Ok(Json(serde_json::to_value(summaries).unwrap()))
+    }
 }
 
 pub async fn list_root_features(

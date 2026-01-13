@@ -255,6 +255,17 @@ impl McpServer {
         project_id: Option<&str>,
         state: Option<&str>,
     ) -> Result<FeatureListResponse, McpError> {
+        self.test_list_features_with_options(project_id, state, true, None, None)
+    }
+
+    pub fn test_list_features_with_options(
+        &self,
+        project_id: Option<&str>,
+        state: Option<&str>,
+        include_details: bool,
+        limit: Option<u32>,
+        offset: Option<u32>,
+    ) -> Result<FeatureListResponse, McpError> {
         let features = match project_id {
             Some(pid) => {
                 let project_id = Self::parse_uuid(pid)?;
@@ -280,6 +291,18 @@ impl McpServer {
             }
             None => features,
         };
+
+        // Apply pagination
+        let offset_val = offset.unwrap_or(0) as usize;
+        let features: Vec<_> = features.into_iter().skip(offset_val).collect();
+        let features: Vec<_> = match limit {
+            Some(l) => features.into_iter().take(l as usize).collect(),
+            None => features,
+        };
+
+        // Note: test helper always returns full FeatureListResponse for backwards compatibility
+        // The include_details flag is used in the actual MCP tool to switch response types
+        let _ = include_details; // Acknowledge but don't change response type in test helper
 
         Ok(FeatureListResponse {
             features: features
@@ -819,7 +842,7 @@ impl McpServer {
     // ============================================================
 
     #[tool(
-        description = "List features, optionally filtered by project or state. Use this to discover what features exist and their current state. Returns features ordered by title. Filter by state to find features ready for work (e.g., state='specified')."
+        description = "List features, optionally filtered by project or state. Use this to discover what features exist and their current state. Returns features ordered by priority then title. By default returns summary only (id, title, state, priority, parent_id) to reduce response size. Use include_details=true for full feature details."
     )]
     async fn list_features(
         &self,
@@ -861,22 +884,47 @@ impl McpServer {
             None => features,
         };
 
-        let result = FeatureListResponse {
-            features: features
-                .into_iter()
-                .map(|f| FeatureInfo {
-                    id: f.id.to_string(),
-                    title: f.title,
-                    details: f.details,
-                    desired_details: f.desired_details,
-                    state: f.state.as_str().to_string(),
-                    priority: f.priority,
-                })
-                .collect(),
+        // Apply pagination
+        let offset = req.offset.unwrap_or(0) as usize;
+        let features: Vec<_> = features.into_iter().skip(offset).collect();
+        let features: Vec<_> = match req.limit {
+            Some(limit) => features.into_iter().take(limit as usize).collect(),
+            None => features,
         };
 
-        let json = serde_json::to_string_pretty(&result)
-            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        // Return summary or full details based on include_details flag
+        let json = if req.include_details {
+            let result = FeatureListResponse {
+                features: features
+                    .into_iter()
+                    .map(|f| FeatureInfo {
+                        id: f.id.to_string(),
+                        title: f.title,
+                        details: f.details,
+                        desired_details: f.desired_details,
+                        state: f.state.as_str().to_string(),
+                        priority: f.priority,
+                    })
+                    .collect(),
+            };
+            serde_json::to_string_pretty(&result)
+        } else {
+            let result = FeatureListSummaryResponse {
+                features: features
+                    .into_iter()
+                    .map(|f| FeatureSummaryInfo {
+                        id: f.id.to_string(),
+                        title: f.title,
+                        state: f.state.as_str().to_string(),
+                        priority: f.priority,
+                        parent_id: f.parent_id.map(|id| id.to_string()),
+                    })
+                    .collect(),
+            };
+            serde_json::to_string_pretty(&result)
+        };
+
+        let json = json.map_err(|e| McpError::internal_error(e.to_string(), None))?;
 
         Ok(CallToolResult::success(vec![Content::text(json)]))
     }

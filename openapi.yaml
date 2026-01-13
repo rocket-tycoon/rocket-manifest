@@ -182,16 +182,28 @@ paths:
     get:
       tags: [Features]
       summary: List all features in a project
+      description: |
+        Returns features ordered by priority then title. By default returns summary only
+        (id, project_id, parent_id, title, state, priority) to reduce response size.
+        Use include_details=true for full feature details.
       operationId: listProjectFeatures
+      parameters:
+        - $ref: '#/components/parameters/IncludeDetails'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
       responses:
         '200':
-          description: All features in the project
+          description: Features in the project (summary by default, full if include_details=true)
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Feature'
+                oneOf:
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/FeatureSummary'
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/Feature'
     post:
       tags: [Features]
       summary: Create a feature in a project
@@ -272,16 +284,28 @@ paths:
     get:
       tags: [Features]
       summary: List all features across all projects
+      description: |
+        Returns features ordered by priority then title. By default returns summary only
+        (id, project_id, parent_id, title, state, priority) to reduce response size.
+        Use include_details=true for full feature details.
       operationId: listFeatures
+      parameters:
+        - $ref: '#/components/parameters/IncludeDetails'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
       responses:
         '200':
-          description: All features
+          description: Features (summary by default, full if include_details=true)
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Feature'
+                oneOf:
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/FeatureSummary'
+                  - type: array
+                    items:
+                      $ref: '#/components/schemas/Feature'
 
   /features/{id}:
     parameters:
@@ -660,6 +684,34 @@ components:
         format: uuid
       description: Task UUID
 
+    IncludeDetails:
+      name: include_details
+      in: query
+      required: false
+      schema:
+        type: boolean
+        default: false
+      description: Include full details in response. Defaults to false (summary mode) to reduce response size.
+
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+      description: Maximum number of items to return.
+
+    Offset:
+      name: offset
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      description: Number of items to skip for pagination.
+
   responses:
     NotFound:
       description: Resource not found
@@ -858,6 +910,32 @@ components:
         - specified: Requirements defined
         - implemented: Feature is live in codebase
         - deprecated: Feature marked for removal
+
+    FeatureSummary:
+      type: object
+      description: Lightweight feature summary without details (used for list operations)
+      required: [id, project_id, title, state, priority]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Parent feature ID (null for root features)
+        title:
+          type: string
+          example: "User Authentication"
+        state:
+          $ref: '#/components/schemas/FeatureState'
+        priority:
+          type: integer
+          default: 0
+          description: Priority for ordering within parent (lower values first)
 
     CreateFeatureInput:
       type: object

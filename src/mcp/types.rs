@@ -104,6 +104,15 @@ pub struct ListFeaturesRequest {
         description = "Optional state filter: 'proposed', 'specified', 'implemented', or 'deprecated'"
     )]
     pub state: Option<String>,
+    #[schemars(
+        description = "Include full details in response. Defaults to false (summary mode) to reduce response size."
+    )]
+    #[serde(default)]
+    pub include_details: bool,
+    #[schemars(description = "Maximum number of features to return. Defaults to no limit.")]
+    pub limit: Option<u32>,
+    #[schemars(description = "Number of features to skip for pagination. Defaults to 0.")]
+    pub offset: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -271,6 +280,23 @@ pub struct CompleteSessionResponse {
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct FeatureListResponse {
     pub features: Vec<FeatureInfo>,
+}
+
+/// Lightweight feature summary without details (used for MCP list operations).
+/// Uses string IDs to match MCP convention.
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct FeatureSummaryInfo {
+    pub id: String,
+    pub title: String,
+    pub state: String,
+    pub priority: i32,
+    pub parent_id: Option<String>,
+}
+
+/// Response for list_features in summary mode (default).
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct FeatureListSummaryResponse {
+    pub features: Vec<FeatureSummaryInfo>,
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
