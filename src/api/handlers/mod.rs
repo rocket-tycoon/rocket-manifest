@@ -10,6 +10,33 @@ use crate::db::Database;
 use crate::models::*;
 
 // ============================================================
+// Error Handling
+// ============================================================
+
+/// Log an internal error and return a sanitized response to the client.
+/// The full error is logged server-side for debugging, but clients only
+/// see a generic message to avoid leaking internal details.
+///
+/// Some errors are validation errors that should be exposed to the client
+/// (e.g., "Sessions can only be created on leaf features"). These are
+/// returned as-is with a BAD_REQUEST status.
+fn internal_error(e: impl std::fmt::Display) -> (StatusCode, String) {
+    let msg = e.to_string();
+
+    // Known validation errors that are safe to expose
+    if msg.contains("leaf") || msg.contains("not active") || msg.contains("not found") {
+        tracing::warn!("Validation error: {}", msg);
+        return (StatusCode::BAD_REQUEST, msg);
+    }
+
+    tracing::error!("Internal error: {}", msg);
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "Internal server error".to_string(),
+    )
+}
+
+// ============================================================
 // Health
 // ============================================================
 
@@ -24,9 +51,7 @@ pub async fn health() -> impl IntoResponse {
 pub async fn list_projects(
     State(db): State<Database>,
 ) -> Result<Json<Vec<Project>>, (StatusCode, String)> {
-    db.get_all_projects()
-        .map(Json)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+    db.get_all_projects().map(Json).map_err(internal_error)
 }
 
 pub async fn get_project(
@@ -34,7 +59,7 @@ pub async fn get_project(
     Path(id): Path<Uuid>,
 ) -> Result<Json<ProjectWithDirectories>, (StatusCode, String)> {
     db.get_project_with_directories(id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map_err(internal_error)?
         .map(Json)
         .ok_or((StatusCode::NOT_FOUND, "Project not found".to_string()))
 }
@@ -45,7 +70,7 @@ pub async fn create_project(
 ) -> Result<(StatusCode, Json<Project>), (StatusCode, String)> {
     db.create_project(input)
         .map(|p| (StatusCode::CREATED, Json(p)))
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        .map_err(internal_error)
 }
 
 pub async fn update_project(
@@ -54,7 +79,7 @@ pub async fn update_project(
     Json(input): Json<UpdateProjectInput>,
 ) -> Result<Json<Project>, (StatusCode, String)> {
     db.update_project(id, input)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map_err(internal_error)?
         .map(Json)
         .ok_or((StatusCode::NOT_FOUND, "Project not found".to_string()))
 }
@@ -63,10 +88,7 @@ pub async fn delete_project(
     State(db): State<Database>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    if db
-        .delete_project(id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-    {
+    if db.delete_project(id).map_err(internal_error)? {
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err((StatusCode::NOT_FOUND, "Project not found".to_string()))
@@ -83,7 +105,7 @@ pub async fn list_project_directories(
 ) -> Result<Json<Vec<ProjectDirectory>>, (StatusCode, String)> {
     db.get_project_directories(project_id)
         .map(Json)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        .map_err(internal_error)
 }
 
 pub async fn add_project_directory(
@@ -93,17 +115,14 @@ pub async fn add_project_directory(
 ) -> Result<(StatusCode, Json<ProjectDirectory>), (StatusCode, String)> {
     db.add_project_directory(project_id, input)
         .map(|d| (StatusCode::CREATED, Json(d)))
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        .map_err(internal_error)
 }
 
 pub async fn remove_project_directory(
     State(db): State<Database>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    if db
-        .remove_project_directory(id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-    {
+    if db.remove_project_directory(id).map_err(internal_error)? {
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err((StatusCode::NOT_FOUND, "Directory not found".to_string()))
@@ -117,9 +136,7 @@ pub async fn remove_project_directory(
 pub async fn list_features(
     State(db): State<Database>,
 ) -> Result<Json<Vec<Feature>>, (StatusCode, String)> {
-    db.get_all_features()
-        .map(Json)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+    db.get_all_features().map(Json).map_err(internal_error)
 }
 
 pub async fn list_project_features(
@@ -128,7 +145,7 @@ pub async fn list_project_features(
 ) -> Result<Json<Vec<Feature>>, (StatusCode, String)> {
     db.get_features_by_project(project_id)
         .map(Json)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        .map_err(internal_error)
 }
 
 pub async fn list_root_features(
@@ -137,7 +154,7 @@ pub async fn list_root_features(
 ) -> Result<Json<Vec<Feature>>, (StatusCode, String)> {
     db.get_root_features(project_id)
         .map(Json)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        .map_err(internal_error)
 }
 
 pub async fn get_feature_tree(
@@ -146,16 +163,14 @@ pub async fn get_feature_tree(
 ) -> Result<Json<Vec<FeatureTreeNode>>, (StatusCode, String)> {
     db.get_feature_tree(project_id)
         .map(Json)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        .map_err(internal_error)
 }
 
 pub async fn list_children(
     State(db): State<Database>,
     Path(parent_id): Path<Uuid>,
 ) -> Result<Json<Vec<Feature>>, (StatusCode, String)> {
-    db.get_children(parent_id)
-        .map(Json)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+    db.get_children(parent_id).map(Json).map_err(internal_error)
 }
 
 pub async fn get_feature_history(
@@ -164,7 +179,7 @@ pub async fn get_feature_history(
 ) -> Result<Json<Vec<FeatureHistory>>, (StatusCode, String)> {
     db.get_feature_history(feature_id)
         .map(Json)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        .map_err(internal_error)
 }
 
 pub async fn list_feature_sessions(
@@ -173,12 +188,12 @@ pub async fn list_feature_sessions(
 ) -> Result<Json<Vec<Session>>, (StatusCode, String)> {
     // First verify feature exists
     db.get_feature(feature_id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map_err(internal_error)?
         .ok_or((StatusCode::NOT_FOUND, "Feature not found".to_string()))?;
 
     db.get_sessions_by_feature(feature_id)
         .map(Json)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        .map_err(internal_error)
 }
 
 pub async fn create_feature_session(
@@ -188,7 +203,7 @@ pub async fn create_feature_session(
 ) -> Result<(StatusCode, Json<SessionResponse>), (StatusCode, String)> {
     // First verify feature exists
     db.get_feature(feature_id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map_err(internal_error)?
         .ok_or((StatusCode::NOT_FOUND, "Feature not found".to_string()))?;
 
     // Convert to CreateSessionInput with feature_id from path
@@ -200,7 +215,7 @@ pub async fn create_feature_session(
 
     db.create_session(session_input)
         .map(|s| (StatusCode::CREATED, Json(s)))
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        .map_err(internal_error)
 }
 
 pub async fn get_feature(
@@ -208,7 +223,7 @@ pub async fn get_feature(
     Path(id): Path<Uuid>,
 ) -> Result<Json<Feature>, (StatusCode, String)> {
     db.get_feature(id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map_err(internal_error)?
         .map(Json)
         .ok_or((StatusCode::NOT_FOUND, "Feature not found".to_string()))
 }
@@ -218,7 +233,7 @@ pub async fn get_feature_diff(
     Path(id): Path<Uuid>,
 ) -> Result<Json<FeatureDiff>, (StatusCode, String)> {
     db.get_feature_diff(id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map_err(internal_error)?
         .map(Json)
         .ok_or((StatusCode::NOT_FOUND, "Feature not found".to_string()))
 }
@@ -230,7 +245,7 @@ pub async fn create_feature(
 ) -> Result<(StatusCode, Json<Feature>), (StatusCode, String)> {
     db.create_feature(project_id, input)
         .map(|f| (StatusCode::CREATED, Json(f)))
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        .map_err(internal_error)
 }
 
 pub async fn update_feature(
@@ -239,7 +254,7 @@ pub async fn update_feature(
     Json(input): Json<UpdateFeatureInput>,
 ) -> Result<Json<Feature>, (StatusCode, String)> {
     db.update_feature(id, input)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map_err(internal_error)?
         .map(Json)
         .ok_or((StatusCode::NOT_FOUND, "Feature not found".to_string()))
 }
@@ -248,10 +263,7 @@ pub async fn delete_feature(
     State(db): State<Database>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    if db
-        .delete_feature(id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-    {
+    if db.delete_feature(id).map_err(internal_error)? {
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err((StatusCode::NOT_FOUND, "Feature not found".to_string()))
@@ -268,7 +280,7 @@ pub async fn create_session(
 ) -> Result<(StatusCode, Json<SessionResponse>), (StatusCode, String)> {
     db.create_session(input)
         .map(|s| (StatusCode::CREATED, Json(s)))
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        .map_err(internal_error)
 }
 
 pub async fn get_session(
@@ -276,7 +288,7 @@ pub async fn get_session(
     Path(id): Path<Uuid>,
 ) -> Result<Json<Session>, (StatusCode, String)> {
     db.get_session(id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map_err(internal_error)?
         .map(Json)
         .ok_or((StatusCode::NOT_FOUND, "Session not found".to_string()))
 }
@@ -286,7 +298,7 @@ pub async fn get_session_status(
     Path(id): Path<Uuid>,
 ) -> Result<Json<SessionStatusResponse>, (StatusCode, String)> {
     db.get_session_status(id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map_err(internal_error)?
         .map(Json)
         .ok_or((StatusCode::NOT_FOUND, "Session not found".to_string()))
 }
@@ -297,7 +309,7 @@ pub async fn complete_session(
     Json(input): Json<CompleteSessionInput>,
 ) -> Result<Json<SessionCompletionResult>, (StatusCode, String)> {
     db.complete_session(id, input)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map_err(internal_error)?
         .map(Json)
         .ok_or((StatusCode::NOT_FOUND, "Session not found".to_string()))
 }
@@ -311,7 +323,7 @@ pub async fn get_task(
     Path(id): Path<Uuid>,
 ) -> Result<Json<Task>, (StatusCode, String)> {
     db.get_task(id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map_err(internal_error)?
         .map(Json)
         .ok_or((StatusCode::NOT_FOUND, "Task not found".to_string()))
 }
@@ -321,10 +333,7 @@ pub async fn update_task(
     Path(id): Path<Uuid>,
     Json(input): Json<UpdateTaskInput>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    if db
-        .update_task(id, input)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-    {
+    if db.update_task(id, input).map_err(internal_error)? {
         Ok(StatusCode::OK)
     } else {
         Err((StatusCode::NOT_FOUND, "Task not found".to_string()))
@@ -338,12 +347,12 @@ pub async fn create_session_task(
 ) -> Result<(StatusCode, Json<Task>), (StatusCode, String)> {
     // First verify session exists
     db.get_session(session_id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map_err(internal_error)?
         .ok_or((StatusCode::NOT_FOUND, "Session not found".to_string()))?;
 
     db.create_task(session_id, input)
         .map(|t| (StatusCode::CREATED, Json(t)))
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        .map_err(internal_error)
 }
 
 pub async fn list_session_tasks(
@@ -352,10 +361,10 @@ pub async fn list_session_tasks(
 ) -> Result<Json<Vec<Task>>, (StatusCode, String)> {
     // First verify session exists
     db.get_session(session_id)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map_err(internal_error)?
         .ok_or((StatusCode::NOT_FOUND, "Session not found".to_string()))?;
 
     db.get_tasks_by_session(session_id)
         .map(Json)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        .map_err(internal_error)
 }

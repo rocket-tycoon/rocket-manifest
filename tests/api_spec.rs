@@ -464,7 +464,7 @@ mod session_leaf_validation {
             })
             .await;
 
-        response.assert_status_internal_server_error();
+        response.assert_status_bad_request();
         let body = response.text();
         assert!(body.contains("leaf"));
     }
@@ -1717,7 +1717,7 @@ mod feature_sessions {
             })
             .await;
 
-        response.assert_status_internal_server_error();
+        response.assert_status_bad_request();
         let body = response.text();
         assert!(body.contains("leaf"));
     }
