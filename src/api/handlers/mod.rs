@@ -167,11 +167,57 @@ pub async fn get_feature_history(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
+pub async fn list_feature_sessions(
+    State(db): State<Database>,
+    Path(feature_id): Path<Uuid>,
+) -> Result<Json<Vec<Session>>, (StatusCode, String)> {
+    // First verify feature exists
+    db.get_feature(feature_id)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or((StatusCode::NOT_FOUND, "Feature not found".to_string()))?;
+
+    db.get_sessions_by_feature(feature_id)
+        .map(Json)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+pub async fn create_feature_session(
+    State(db): State<Database>,
+    Path(feature_id): Path<Uuid>,
+    Json(input): Json<CreateFeatureSessionInput>,
+) -> Result<(StatusCode, Json<SessionResponse>), (StatusCode, String)> {
+    // First verify feature exists
+    db.get_feature(feature_id)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or((StatusCode::NOT_FOUND, "Feature not found".to_string()))?;
+
+    // Convert to CreateSessionInput with feature_id from path
+    let session_input = CreateSessionInput {
+        feature_id,
+        goal: input.goal,
+        tasks: input.tasks,
+    };
+
+    db.create_session(session_input)
+        .map(|s| (StatusCode::CREATED, Json(s)))
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
 pub async fn get_feature(
     State(db): State<Database>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Feature>, (StatusCode, String)> {
     db.get_feature(id)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .map(Json)
+        .ok_or((StatusCode::NOT_FOUND, "Feature not found".to_string()))
+}
+
+pub async fn get_feature_diff(
+    State(db): State<Database>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<FeatureDiff>, (StatusCode, String)> {
+    db.get_feature_diff(id)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
         .map(Json)
         .ok_or((StatusCode::NOT_FOUND, "Feature not found".to_string()))
@@ -283,4 +329,33 @@ pub async fn update_task(
     } else {
         Err((StatusCode::NOT_FOUND, "Task not found".to_string()))
     }
+}
+
+pub async fn create_session_task(
+    State(db): State<Database>,
+    Path(session_id): Path<Uuid>,
+    Json(input): Json<CreateTaskInput>,
+) -> Result<(StatusCode, Json<Task>), (StatusCode, String)> {
+    // First verify session exists
+    db.get_session(session_id)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or((StatusCode::NOT_FOUND, "Session not found".to_string()))?;
+
+    db.create_task(session_id, input)
+        .map(|t| (StatusCode::CREATED, Json(t)))
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+pub async fn list_session_tasks(
+    State(db): State<Database>,
+    Path(session_id): Path<Uuid>,
+) -> Result<Json<Vec<Task>>, (StatusCode, String)> {
+    // First verify session exists
+    db.get_session(session_id)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or((StatusCode::NOT_FOUND, "Session not found".to_string()))?;
+
+    db.get_tasks_by_session(session_id)
+        .map(Json)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }

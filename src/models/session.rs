@@ -11,7 +11,7 @@ use super::task::CreateTaskInput;
 /// An active work session on a leaf feature.
 ///
 /// Sessions are **ephemeral**—they exist only during active work. When a session
-/// completes, its tasks are summarized into a [`FeatureHistory`] entry and deleted.
+/// completes, its tasks are summarized into a `FeatureHistory` entry and deleted.
 /// Only one session can be active on a feature at a time.
 ///
 /// Sessions can only be created on **leaf features** (features with no children).
@@ -73,6 +73,18 @@ pub struct CreateSessionInput {
     /// High-level objective for this work session.
     pub goal: String,
     /// Initial tasks to create with the session.
+    pub tasks: Vec<CreateTaskInput>,
+}
+
+/// Input for creating a session via RESTful endpoint (feature_id from path).
+///
+/// Used with `POST /features/{id}/sessions` where the feature ID comes from the URL path.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateFeatureSessionInput {
+    /// High-level objective for this work session.
+    pub goal: String,
+    /// Initial tasks to create with the session.
+    #[serde(default)]
     pub tasks: Vec<CreateTaskInput>,
 }
 

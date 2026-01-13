@@ -949,6 +949,7 @@ mod features {
                 parent_id: None,
                 title: Some("Updated Title".to_string()),
                 details: Some("New details".to_string()),
+                desired_details: None,
                 priority: None,
                 state: Some(FeatureState::Implemented),
             })
@@ -971,11 +972,100 @@ mod features {
             .json(&UpdateFeatureInput {
                 parent_id: None,
                 title: Some("Title".to_string()),
-
                 details: None,
+                desired_details: None,
                 priority: None,
                 state: None,
             })
+            .await;
+
+        response.assert_status_not_found();
+    }
+}
+
+// ============================================================
+// Feature Diff
+// ============================================================
+
+mod feature_diff {
+    use super::*;
+
+    #[tokio::test]
+    async fn returns_diff_with_no_changes_when_no_desired_details() {
+        let server = setup();
+        let project = create_test_project(&server).await;
+
+        let feature = server
+            .post(&format!("/api/v1/projects/{}/features", project.id))
+            .json(&CreateFeatureInput {
+                parent_id: None,
+                title: "Feature".to_string(),
+                details: Some("Current details".to_string()),
+                priority: None,
+                state: None,
+            })
+            .await
+            .json::<Feature>();
+
+        let response = server
+            .get(&format!("/api/v1/features/{}/diff", feature.id))
+            .await;
+
+        response.assert_status_ok();
+        let diff: FeatureDiff = response.json();
+        assert!(!diff.has_changes);
+        assert_eq!(diff.current, Some("Current details".to_string()));
+        assert!(diff.desired.is_none());
+    }
+
+    #[tokio::test]
+    async fn returns_diff_with_changes_when_desired_details_set() {
+        let server = setup();
+        let project = create_test_project(&server).await;
+
+        let feature = server
+            .post(&format!("/api/v1/projects/{}/features", project.id))
+            .json(&CreateFeatureInput {
+                parent_id: None,
+                title: "Feature".to_string(),
+                details: Some("Current".to_string()),
+                priority: None,
+                state: None,
+            })
+            .await
+            .json::<Feature>();
+
+        // Update with desired_details
+        server
+            .put(&format!("/api/v1/features/{}", feature.id))
+            .json(&UpdateFeatureInput {
+                parent_id: None,
+                title: None,
+                details: None,
+                desired_details: Some("Desired".to_string()),
+                priority: None,
+                state: None,
+            })
+            .await;
+
+        let response = server
+            .get(&format!("/api/v1/features/{}/diff", feature.id))
+            .await;
+
+        response.assert_status_ok();
+        let diff: FeatureDiff = response.json();
+        assert!(diff.has_changes);
+        assert_eq!(diff.current, Some("Current".to_string()));
+        assert_eq!(diff.desired, Some("Desired".to_string()));
+    }
+
+    #[tokio::test]
+    async fn returns_not_found_for_nonexistent_feature() {
+        let server = setup();
+        let fake_id = uuid::Uuid::new_v4();
+
+        let response = server
+            .get(&format!("/api/v1/features/{}/diff", fake_id))
             .await;
 
         response.assert_status_not_found();
@@ -1281,5 +1371,354 @@ mod tasks {
             .await;
 
         response.assert_status_not_found();
+    }
+}
+
+// ============================================================
+// Session Tasks
+// ============================================================
+
+mod session_tasks {
+    use super::*;
+
+    #[tokio::test]
+    async fn create_task_in_session() {
+        let server = setup();
+        let project = create_test_project(&server).await;
+
+        let feature = server
+            .post(&format!("/api/v1/projects/{}/features", project.id))
+            .json(&CreateFeatureInput {
+                parent_id: None,
+                title: "Feature".to_string(),
+                details: None,
+                priority: None,
+                state: None,
+            })
+            .await
+            .json::<Feature>();
+
+        let session_response = server
+            .post("/api/v1/sessions")
+            .json(&CreateSessionInput {
+                feature_id: feature.id,
+                goal: "Goal".to_string(),
+                tasks: vec![],
+            })
+            .await
+            .json::<SessionResponse>();
+
+        let response = server
+            .post(&format!(
+                "/api/v1/sessions/{}/tasks",
+                session_response.session.id
+            ))
+            .json(&CreateTaskInput {
+                parent_id: None,
+                title: "New Task".to_string(),
+                scope: "Task scope".to_string(),
+                agent_type: AgentType::Claude,
+            })
+            .await;
+
+        response.assert_status(StatusCode::CREATED);
+        let task: Task = response.json();
+        assert_eq!(task.title, "New Task");
+        assert_eq!(task.scope, "Task scope");
+        assert_eq!(task.agent_type, AgentType::Claude);
+        assert_eq!(task.status, TaskStatus::Pending);
+    }
+
+    #[tokio::test]
+    async fn create_task_returns_not_found_for_nonexistent_session() {
+        let server = setup();
+        let fake_id = uuid::Uuid::new_v4();
+
+        let response = server
+            .post(&format!("/api/v1/sessions/{}/tasks", fake_id))
+            .json(&CreateTaskInput {
+                parent_id: None,
+                title: "Task".to_string(),
+                scope: "Scope".to_string(),
+                agent_type: AgentType::Claude,
+            })
+            .await;
+
+        response.assert_status_not_found();
+    }
+
+    #[tokio::test]
+    async fn list_tasks_in_session() {
+        let server = setup();
+        let project = create_test_project(&server).await;
+
+        let feature = server
+            .post(&format!("/api/v1/projects/{}/features", project.id))
+            .json(&CreateFeatureInput {
+                parent_id: None,
+                title: "Feature".to_string(),
+                details: None,
+                priority: None,
+                state: None,
+            })
+            .await
+            .json::<Feature>();
+
+        let session_response = server
+            .post("/api/v1/sessions")
+            .json(&CreateSessionInput {
+                feature_id: feature.id,
+                goal: "Goal".to_string(),
+                tasks: vec![
+                    CreateTaskInput {
+                        parent_id: None,
+                        title: "Task 1".to_string(),
+                        scope: "Scope 1".to_string(),
+                        agent_type: AgentType::Claude,
+                    },
+                    CreateTaskInput {
+                        parent_id: None,
+                        title: "Task 2".to_string(),
+                        scope: "Scope 2".to_string(),
+                        agent_type: AgentType::Gemini,
+                    },
+                ],
+            })
+            .await
+            .json::<SessionResponse>();
+
+        let response = server
+            .get(&format!(
+                "/api/v1/sessions/{}/tasks",
+                session_response.session.id
+            ))
+            .await;
+
+        response.assert_status_ok();
+        let tasks: Vec<Task> = response.json();
+        assert_eq!(tasks.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn list_tasks_returns_not_found_for_nonexistent_session() {
+        let server = setup();
+        let fake_id = uuid::Uuid::new_v4();
+
+        let response = server
+            .get(&format!("/api/v1/sessions/{}/tasks", fake_id))
+            .await;
+
+        response.assert_status_not_found();
+    }
+}
+
+// ============================================================
+// Feature Sessions
+// ============================================================
+
+mod feature_sessions {
+    use super::*;
+
+    #[tokio::test]
+    async fn returns_empty_list_when_no_sessions() {
+        let server = setup();
+        let project = create_test_project(&server).await;
+
+        let feature = server
+            .post(&format!("/api/v1/projects/{}/features", project.id))
+            .json(&CreateFeatureInput {
+                parent_id: None,
+                title: "Feature".to_string(),
+                details: None,
+                priority: None,
+                state: None,
+            })
+            .await
+            .json::<Feature>();
+
+        let response = server
+            .get(&format!("/api/v1/features/{}/sessions", feature.id))
+            .await;
+
+        response.assert_status_ok();
+        let sessions: Vec<Session> = response.json();
+        assert!(sessions.is_empty());
+    }
+
+    #[tokio::test]
+    async fn returns_sessions_for_feature() {
+        let server = setup();
+        let project = create_test_project(&server).await;
+
+        let feature = server
+            .post(&format!("/api/v1/projects/{}/features", project.id))
+            .json(&CreateFeatureInput {
+                parent_id: None,
+                title: "Feature".to_string(),
+                details: None,
+                priority: None,
+                state: None,
+            })
+            .await
+            .json::<Feature>();
+
+        // Create a session
+        let session_response = server
+            .post("/api/v1/sessions")
+            .json(&CreateSessionInput {
+                feature_id: feature.id,
+                goal: "First session".to_string(),
+                tasks: vec![],
+            })
+            .await
+            .json::<SessionResponse>();
+
+        let response = server
+            .get(&format!("/api/v1/features/{}/sessions", feature.id))
+            .await;
+
+        response.assert_status_ok();
+        let sessions: Vec<Session> = response.json();
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].id, session_response.session.id);
+        assert_eq!(sessions[0].goal, "First session");
+    }
+
+    #[tokio::test]
+    async fn returns_not_found_for_nonexistent_feature() {
+        let server = setup();
+        let fake_id = uuid::Uuid::new_v4();
+
+        let response = server
+            .get(&format!("/api/v1/features/{}/sessions", fake_id))
+            .await;
+
+        response.assert_status_not_found();
+    }
+
+    #[tokio::test]
+    async fn creates_session_via_restful_endpoint() {
+        let server = setup();
+        let project = create_test_project(&server).await;
+
+        let feature = server
+            .post(&format!("/api/v1/projects/{}/features", project.id))
+            .json(&CreateFeatureInput {
+                parent_id: None,
+                title: "Feature".to_string(),
+                details: None,
+                priority: None,
+                state: None,
+            })
+            .await
+            .json::<Feature>();
+
+        let response = server
+            .post(&format!("/api/v1/features/{}/sessions", feature.id))
+            .json(&CreateFeatureSessionInput {
+                goal: "RESTful session".to_string(),
+                tasks: vec![],
+            })
+            .await;
+
+        response.assert_status(StatusCode::CREATED);
+        let session_response: SessionResponse = response.json();
+        assert_eq!(session_response.session.feature_id, feature.id);
+        assert_eq!(session_response.session.goal, "RESTful session");
+        assert_eq!(session_response.session.status, SessionStatus::Active);
+    }
+
+    #[tokio::test]
+    async fn creates_session_with_tasks_via_restful_endpoint() {
+        let server = setup();
+        let project = create_test_project(&server).await;
+
+        let feature = server
+            .post(&format!("/api/v1/projects/{}/features", project.id))
+            .json(&CreateFeatureInput {
+                parent_id: None,
+                title: "Feature".to_string(),
+                details: None,
+                priority: None,
+                state: None,
+            })
+            .await
+            .json::<Feature>();
+
+        let response = server
+            .post(&format!("/api/v1/features/{}/sessions", feature.id))
+            .json(&CreateFeatureSessionInput {
+                goal: "Session with tasks".to_string(),
+                tasks: vec![CreateTaskInput {
+                    parent_id: None,
+                    title: "Task 1".to_string(),
+                    scope: "Scope".to_string(),
+                    agent_type: AgentType::Claude,
+                }],
+            })
+            .await;
+
+        response.assert_status(StatusCode::CREATED);
+        let session_response: SessionResponse = response.json();
+        assert_eq!(session_response.tasks.len(), 1);
+        assert_eq!(session_response.tasks[0].title, "Task 1");
+    }
+
+    #[tokio::test]
+    async fn create_session_returns_not_found_for_nonexistent_feature() {
+        let server = setup();
+        let fake_id = uuid::Uuid::new_v4();
+
+        let response = server
+            .post(&format!("/api/v1/features/{}/sessions", fake_id))
+            .json(&CreateFeatureSessionInput {
+                goal: "Goal".to_string(),
+                tasks: vec![],
+            })
+            .await;
+
+        response.assert_status_not_found();
+    }
+
+    #[tokio::test]
+    async fn create_session_rejects_non_leaf_feature() {
+        let server = setup();
+        let project = create_test_project(&server).await;
+
+        let parent = server
+            .post(&format!("/api/v1/projects/{}/features", project.id))
+            .json(&CreateFeatureInput {
+                parent_id: None,
+                title: "Parent".to_string(),
+                details: None,
+                priority: None,
+                state: None,
+            })
+            .await
+            .json::<Feature>();
+
+        // Create a child to make parent non-leaf
+        server
+            .post(&format!("/api/v1/projects/{}/features", project.id))
+            .json(&CreateFeatureInput {
+                parent_id: Some(parent.id),
+                title: "Child".to_string(),
+                details: None,
+                priority: None,
+                state: None,
+            })
+            .await;
+
+        let response = server
+            .post(&format!("/api/v1/features/{}/sessions", parent.id))
+            .json(&CreateFeatureSessionInput {
+                goal: "Goal".to_string(),
+                tasks: vec![],
+            })
+            .await;
+
+        response.assert_status_internal_server_error();
+        let body = response.text();
+        assert!(body.contains("leaf"));
     }
 }
