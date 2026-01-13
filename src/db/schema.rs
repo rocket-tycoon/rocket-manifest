@@ -33,6 +33,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "feature_priority",
         sql: include_str!("migrations/005_feature_priority.sql"),
     },
+    Migration {
+        version: "006",
+        name: "remove_story",
+        sql: include_str!("migrations/006_remove_story.sql"),
+    },
 ];
 
 pub fn run_migrations(conn: &Connection) -> Result<()> {
@@ -147,7 +152,7 @@ mod tests {
 
         // Verify all migrations were recorded
         let versions = get_applied_migrations(&conn).unwrap();
-        assert_eq!(versions, vec!["001", "002", "003", "004", "005"]);
+        assert_eq!(versions, vec!["001", "002", "003", "004", "005", "006"]);
     }
 
     #[test]
@@ -157,28 +162,39 @@ mod tests {
         run_migrations(&conn).unwrap(); // Should not fail
 
         let versions = get_applied_migrations(&conn).unwrap();
-        assert_eq!(versions, vec!["001", "002", "003", "004", "005"]);
+        assert_eq!(versions, vec!["001", "002", "003", "004", "005", "006"]);
     }
 
     #[test]
     fn test_existing_db_gets_baseline() {
         let conn = Connection::open_in_memory().unwrap();
 
-        // Simulate existing database by creating core tables directly
-        // Must include projects table for migration 002 to work
-        // Must include feature_history table for migration 004 to work
-        // Must include parent_id on features for migration 005 index
+        // Simulate existing database created before migration tracking
+        // This represents the 001_initial schema (without later migrations like priority)
+        // Baseline marks 001 as applied, then migrations 002-006 will run
         conn.execute_batch("
-            CREATE TABLE features (id TEXT PRIMARY KEY, parent_id TEXT);
+            CREATE TABLE features (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                parent_id TEXT,
+                title TEXT NOT NULL,
+                story TEXT,
+                details TEXT,
+                state TEXT NOT NULL DEFAULT 'proposed',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
             CREATE TABLE projects (id TEXT PRIMARY KEY, name TEXT, description TEXT, created_at TEXT, updated_at TEXT);
             CREATE TABLE project_directories (id TEXT PRIMARY KEY, project_id TEXT, path TEXT, git_remote TEXT, is_primary INTEGER, created_at TEXT);
             CREATE TABLE feature_history (id TEXT PRIMARY KEY, feature_id TEXT, session_id TEXT, summary TEXT, files_changed JSON, author TEXT, created_at TEXT);
+            CREATE INDEX idx_features_project ON features(project_id);
+            CREATE INDEX idx_features_parent ON features(parent_id);
         ").unwrap();
 
-        // Run migrations - should detect existing DB and baseline, then apply 002 and 003
+        // Run migrations - should detect existing DB and baseline, then apply remaining
         run_migrations(&conn).unwrap();
 
         let versions = get_applied_migrations(&conn).unwrap();
-        assert_eq!(versions, vec!["001", "002", "003", "004", "005"]);
+        assert_eq!(versions, vec!["001", "002", "003", "004", "005", "006"]);
     }
 }

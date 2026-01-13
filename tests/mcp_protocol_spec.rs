@@ -313,7 +313,7 @@ mod tool_calls {
             json!({
                 "project_id": project_id,
                 "title": "User Authentication",
-                "story": "As a user, I want to log in",
+                "details": "As a user, I want to log in",
                 "state": "specified"
             }),
         );

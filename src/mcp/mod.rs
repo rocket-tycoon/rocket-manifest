@@ -74,7 +74,6 @@ impl McpServer {
             feature: FeatureInfo {
                 id: feature.id.to_string(),
                 title: feature.title,
-                story: feature.story,
                 details: feature.details,
                 state: feature.state.as_str().to_string(),
                 priority: feature.priority,
@@ -287,7 +286,6 @@ impl McpServer {
                 .map(|f| FeatureInfo {
                     id: f.id.to_string(),
                     title: f.title,
-                    story: f.story,
                     details: f.details,
                     state: f.state.as_str().to_string(),
                     priority: f.priority,
@@ -307,7 +305,6 @@ impl McpServer {
         Ok(FeatureInfo {
             id: feature.id.to_string(),
             title: feature.title,
-            story: feature.story,
             details: feature.details,
             state: feature.state.as_str().to_string(),
             priority: feature.priority,
@@ -370,7 +367,6 @@ impl McpServer {
                 UpdateFeatureInput {
                     parent_id: None,
                     title: None,
-                    story: None,
                     details: None,
                     state: Some(new_state),
                     priority: None,
@@ -382,7 +378,6 @@ impl McpServer {
         Ok(FeatureInfo {
             id: feature.id.to_string(),
             title: feature.title,
-            story: feature.story,
             details: feature.details,
             state: feature.state.as_str().to_string(),
             priority: feature.priority,
@@ -449,7 +444,6 @@ impl McpServer {
         project_id: &str,
         parent_id: Option<&str>,
         title: &str,
-        story: Option<&str>,
         details: Option<&str>,
         state: &str,
     ) -> Result<FeatureInfo, McpError> {
@@ -468,7 +462,6 @@ impl McpServer {
                 CreateFeatureInput {
                     parent_id,
                     title: title.to_string(),
-                    story: story.map(|s| s.to_string()),
                     details: details.map(|s| s.to_string()),
                     state: Some(state),
                     priority: None,
@@ -479,7 +472,6 @@ impl McpServer {
         Ok(FeatureInfo {
             id: feature.id.to_string(),
             title: feature.title,
-            story: feature.story,
             details: feature.details,
             state: feature.state.as_str().to_string(),
             priority: feature.priority,
@@ -523,7 +515,7 @@ impl McpServer {
     // ============================================================
 
     #[tool(
-        description = "Retrieve your assigned task with full feature context. Call this FIRST when starting work. Returns: task details (id, title, scope, status), feature specification (title, story, details), and session goal. Use this information to understand what to implement before writing any code."
+        description = "Retrieve your assigned task with full feature context. Call this FIRST when starting work. Returns: task details (id, title, scope, status), feature specification (title, details), and session goal. Use this information to understand what to implement before writing any code."
     )]
     async fn get_task_context(
         &self,
@@ -561,7 +553,6 @@ impl McpServer {
             feature: FeatureInfo {
                 id: feature.id.to_string(),
                 title: feature.title,
-                story: feature.story,
                 details: feature.details,
                 state: feature.state.as_str().to_string(),
                 priority: feature.priority,
@@ -869,7 +860,6 @@ impl McpServer {
                 .map(|f| FeatureInfo {
                     id: f.id.to_string(),
                     title: f.title,
-                    story: f.story,
                     details: f.details,
                     state: f.state.as_str().to_string(),
                     priority: f.priority,
@@ -884,7 +874,7 @@ impl McpServer {
     }
 
     #[tool(
-        description = "Get detailed information about a specific feature by ID. Returns the feature's title, story, implementation details, and current state. Use this before creating a session to understand what needs to be built."
+        description = "Get detailed information about a specific feature by ID. Returns the feature's title, details, and current state. Use this before creating a session to understand what needs to be built."
     )]
     async fn get_feature(
         &self,
@@ -902,7 +892,6 @@ impl McpServer {
         let result = FeatureInfo {
             id: feature.id.to_string(),
             title: feature.title,
-            story: feature.story,
             details: feature.details,
             state: feature.state.as_str().to_string(),
             priority: feature.priority,
@@ -993,7 +982,6 @@ impl McpServer {
                 UpdateFeatureInput {
                     parent_id: None,
                     title: None,
-                    story: None,
                     details: None,
                     state: Some(new_state),
                     priority: None,
@@ -1005,7 +993,6 @@ impl McpServer {
         let result = FeatureInfo {
             id: feature.id.to_string(),
             title: feature.title,
-            story: feature.story,
             details: feature.details,
             state: feature.state.as_str().to_string(),
             priority: feature.priority,
@@ -1119,7 +1106,6 @@ impl McpServer {
                 CreateFeatureInput {
                     parent_id,
                     title: req.title,
-                    story: req.story,
                     details: req.details,
                     state: Some(state),
                     priority: req.priority,
@@ -1130,7 +1116,6 @@ impl McpServer {
         let result = FeatureInfo {
             id: feature.id.to_string(),
             title: feature.title,
-            story: feature.story,
             details: feature.details,
             state: feature.state.as_str().to_string(),
             priority: feature.priority,
@@ -1196,7 +1181,6 @@ impl McpServer {
                 CreateFeatureInput {
                     parent_id,
                     title: proposed.title.clone(),
-                    story: proposed.story.clone(),
                     details: proposed.details.clone(),
                     state: Some(FeatureState::Specified),
                     priority: Some(proposed.priority),
@@ -1284,8 +1268,8 @@ Test: "Can a user observe or interact with this?" If yes, it can be a feature.
 
 FEATURE FIELDS:
 - title: Short capability name (2-5 words). What users can DO.
-- story: User perspective - "As a [user], I can [capability] so that [benefit]"
-- details: Technical notes, constraints, implementation guidance, acceptance criteria
+- details: Feature specification including user stories, technical notes, constraints, acceptance criteria.
+          User stories can follow "As a [user], I can [capability] so that [benefit]" format.
 - state: proposed (idea) → specified (ready to build) → implemented (done) → deprecated
 - priority: Lower number = implement first. Use for sequencing.
 
@@ -1363,7 +1347,7 @@ ORCHESTRATOR WORKFLOW (when managing a feature):
 7. Call complete_session when all tasks are done
 
 IMPORTANT:
-- Read feature story and details carefully before coding
+- Read feature details carefully before coding
 - Only call complete_task when work is verified (tests pass, code compiles)
 - Tasks should be small enough for one agent (1-3 story points)"#
                     .into(),

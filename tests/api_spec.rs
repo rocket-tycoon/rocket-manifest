@@ -52,7 +52,7 @@ mod feature_roots {
                 parent_id: None,
                 title: "Root".to_string(),
                 state: None,
-                story: None,
+
                 details: None,
                 priority: None,
             })
@@ -66,7 +66,7 @@ mod feature_roots {
                 parent_id: Some(root.id),
                 title: "Child".to_string(),
                 state: None,
-                story: None,
+
                 details: None,
                 priority: None,
             })
@@ -98,7 +98,7 @@ mod feature_children {
                 parent_id: None,
                 title: "Leaf".to_string(),
                 state: None,
-                story: None,
+
                 details: None,
                 priority: None,
             })
@@ -125,7 +125,7 @@ mod feature_children {
                 parent_id: None,
                 title: "Parent".to_string(),
                 state: None,
-                story: None,
+
                 details: None,
                 priority: None,
             })
@@ -138,7 +138,7 @@ mod feature_children {
                 parent_id: Some(parent.id),
                 title: "Zebra".to_string(),
                 state: None,
-                story: None,
+
                 details: None,
                 priority: None,
             })
@@ -150,7 +150,7 @@ mod feature_children {
                 parent_id: Some(parent.id),
                 title: "Alpha".to_string(),
                 state: None,
-                story: None,
+
                 details: None,
                 priority: None,
             })
@@ -178,7 +178,7 @@ mod feature_children {
                 parent_id: None,
                 title: "Root".to_string(),
                 state: None,
-                story: None,
+
                 details: None,
                 priority: None,
             })
@@ -191,7 +191,7 @@ mod feature_children {
                 parent_id: Some(root.id),
                 title: "Child".to_string(),
                 state: None,
-                story: None,
+
                 details: None,
                 priority: None,
             })
@@ -204,7 +204,7 @@ mod feature_children {
                 parent_id: Some(child.id),
                 title: "Grandchild".to_string(),
                 state: None,
-                story: None,
+
                 details: None,
                 priority: None,
             })
@@ -235,7 +235,7 @@ mod feature_hierarchy_create {
                 parent_id: None,
                 title: "Authentication".to_string(),
                 state: None,
-                story: None,
+
                 details: None,
                 priority: None,
             })
@@ -248,7 +248,7 @@ mod feature_hierarchy_create {
                 parent_id: Some(parent.id),
                 title: "Login".to_string(),
                 state: None,
-                story: None,
+
                 details: None,
                 priority: None,
             })
@@ -271,7 +271,7 @@ mod feature_hierarchy_create {
                 parent_id: None,
                 title: "Authentication".to_string(),
                 state: None,
-                story: None,
+
                 details: None,
                 priority: None,
             })
@@ -284,7 +284,7 @@ mod feature_hierarchy_create {
                 parent_id: Some(level0.id),
                 title: "OAuth".to_string(),
                 state: None,
-                story: None,
+
                 details: None,
                 priority: None,
             })
@@ -297,7 +297,7 @@ mod feature_hierarchy_create {
                 parent_id: Some(level1.id),
                 title: "Google".to_string(),
                 state: None,
-                story: None,
+
                 details: None,
                 priority: None,
             })
@@ -327,7 +327,7 @@ mod feature_cascade_delete {
                 parent_id: None,
                 title: "Parent".to_string(),
                 state: None,
-                story: None,
+
                 details: None,
                 priority: None,
             })
@@ -340,7 +340,7 @@ mod feature_cascade_delete {
                 parent_id: Some(parent.id),
                 title: "Child".to_string(),
                 state: None,
-                story: None,
+
                 details: None,
                 priority: None,
             })
@@ -374,7 +374,7 @@ mod feature_history {
             .json(&CreateFeatureInput {
                 parent_id: None,
                 title: "New Feature".to_string(),
-                story: None,
+
                 details: None,
                 priority: None,
                 state: None,
@@ -406,7 +406,7 @@ mod session_leaf_validation {
                 parent_id: None,
                 title: "Leaf Feature".to_string(),
                 state: None,
-                story: None,
+
                 details: None,
                 priority: None,
             })
@@ -436,7 +436,7 @@ mod session_leaf_validation {
                 parent_id: None,
                 title: "Parent".to_string(),
                 state: None,
-                story: None,
+
                 details: None,
                 priority: None,
             })
@@ -449,7 +449,7 @@ mod session_leaf_validation {
                 parent_id: Some(parent.id),
                 title: "Child".to_string(),
                 state: None,
-                story: None,
+
                 details: None,
                 priority: None,
             })
@@ -484,7 +484,7 @@ mod session_completion {
                 parent_id: None,
                 title: "Feature".to_string(),
                 state: None,
-                story: None,
+
                 details: None,
                 priority: None,
             })
@@ -535,7 +535,7 @@ mod session_completion {
                 parent_id: None,
                 title: "Feature".to_string(),
                 state: None,
-                story: None,
+
                 details: None,
                 priority: None,
             })
@@ -861,7 +861,7 @@ mod features {
             .json(&CreateFeatureInput {
                 parent_id: None,
                 title: "Feature 1".to_string(),
-                story: None,
+
                 details: None,
                 priority: None,
                 state: None,
@@ -873,7 +873,7 @@ mod features {
             .json(&CreateFeatureInput {
                 parent_id: None,
                 title: "Feature 2".to_string(),
-                story: None,
+
                 details: None,
                 priority: None,
                 state: None,
@@ -897,8 +897,7 @@ mod features {
             .json(&CreateFeatureInput {
                 parent_id: None,
                 title: "Test Feature".to_string(),
-                story: Some("As a user...".to_string()),
-                details: Some("Implementation details".to_string()),
+                details: Some("As a user... Implementation details".to_string()),
                 state: Some(FeatureState::Specified),
                 priority: None,
             })
@@ -936,7 +935,7 @@ mod features {
             .json(&CreateFeatureInput {
                 parent_id: None,
                 title: "Original Title".to_string(),
-                story: None,
+
                 details: None,
                 priority: None,
                 state: Some(FeatureState::Proposed),
@@ -949,8 +948,7 @@ mod features {
             .json(&UpdateFeatureInput {
                 parent_id: None,
                 title: Some("Updated Title".to_string()),
-                story: Some("New story".to_string()),
-                details: None,
+                details: Some("New details".to_string()),
                 priority: None,
                 state: Some(FeatureState::Implemented),
             })
@@ -959,7 +957,7 @@ mod features {
         response.assert_status_ok();
         let updated: Feature = response.json();
         assert_eq!(updated.title, "Updated Title");
-        assert_eq!(updated.story, Some("New story".to_string()));
+        assert_eq!(updated.details, Some("New details".to_string()));
         assert_eq!(updated.state, FeatureState::Implemented);
     }
 
@@ -973,7 +971,7 @@ mod features {
             .json(&UpdateFeatureInput {
                 parent_id: None,
                 title: Some("Title".to_string()),
-                story: None,
+
                 details: None,
                 priority: None,
                 state: None,
@@ -1001,7 +999,7 @@ mod feature_tree {
             .json(&CreateFeatureInput {
                 parent_id: None,
                 title: "Authentication".to_string(),
-                story: None,
+
                 details: None,
                 priority: None,
                 state: None,
@@ -1014,7 +1012,7 @@ mod feature_tree {
             .json(&CreateFeatureInput {
                 parent_id: Some(root.id),
                 title: "Login".to_string(),
-                story: None,
+
                 details: None,
                 priority: None,
                 state: None,
@@ -1026,7 +1024,7 @@ mod feature_tree {
             .json(&CreateFeatureInput {
                 parent_id: Some(root.id),
                 title: "Logout".to_string(),
-                story: None,
+
                 details: None,
                 priority: None,
                 state: None,
@@ -1062,7 +1060,7 @@ mod sessions {
             .json(&CreateFeatureInput {
                 parent_id: None,
                 title: "Feature".to_string(),
-                story: None,
+
                 details: None,
                 priority: None,
                 state: None,
@@ -1111,7 +1109,7 @@ mod sessions {
             .json(&CreateFeatureInput {
                 parent_id: None,
                 title: "Feature Title".to_string(),
-                story: None,
+
                 details: None,
                 priority: None,
                 state: None,
@@ -1167,7 +1165,7 @@ mod tasks {
             .json(&CreateFeatureInput {
                 parent_id: None,
                 title: "Feature".to_string(),
-                story: None,
+
                 details: None,
                 priority: None,
                 state: None,
@@ -1222,7 +1220,7 @@ mod tasks {
             .json(&CreateFeatureInput {
                 parent_id: None,
                 title: "Feature".to_string(),
-                story: None,
+
                 details: None,
                 priority: None,
                 state: None,
