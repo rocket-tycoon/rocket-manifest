@@ -94,6 +94,38 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /projects/by-directory:
+    get:
+      tags: [Projects]
+      summary: Find project by directory path
+      description: |
+        Given a directory path, finds the project that contains it.
+        Matches if the path equals or is a subdirectory of any project directory.
+        Useful for MCP clients to discover project context from the current working directory.
+      operationId: getProjectByDirectory
+      parameters:
+        - name: path
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Absolute directory path to look up
+          example: "/Users/dev/projects/my-app/src"
+      responses:
+        '200':
+          description: Project with directories
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectWithDirectories'
+        '404':
+          description: No project found for the given directory
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "No project found for directory: /Users/dev/unknown"
+
   /projects/{id}:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
@@ -221,6 +253,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Feature'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /projects/{id}/features/bulk:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    post:
+      tags: [Features]
+      summary: Bulk create features with hierarchical structure
+      description: |
+        Create multiple features at once, supporting hierarchical relationships.
+        Use this to set up an entire feature tree in one operation.
+
+        When `confirm=false` (default), returns the proposed features without creating them.
+        This allows reviewing the structure before committing.
+
+        When `confirm=true`, creates all features and returns their IDs.
+        Children are created after their parents, maintaining the tree structure.
+      operationId: bulkCreateFeatures
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkCreateFeaturesInput'
+      responses:
+        '200':
+          description: Proposed or created features
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanFeaturesResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -973,6 +1039,70 @@ components:
           type: integer
           description: Priority for ordering within parent
 
+    BulkCreateFeaturesInput:
+      type: object
+      required: [features]
+      description: Input for bulk feature creation with hierarchical structure
+      properties:
+        features:
+          type: array
+          description: The proposed feature tree to create
+          items:
+            $ref: '#/components/schemas/ProposedFeature'
+        confirm:
+          type: boolean
+          default: false
+          description: |
+            If true, creates the features in the database.
+            If false (default), returns the proposal for review without creating anything.
+
+    ProposedFeature:
+      type: object
+      required: [title]
+      description: A feature proposal for bulk creation, supporting hierarchical structure
+      properties:
+        title:
+          type: string
+          description: Short capability name (2-5 words). What users can DO.
+          example: "User Authentication"
+        details:
+          type: string
+          nullable: true
+          description: |
+            Feature details including user stories, implementation notes, and technical context.
+            User stories can use "As a [user], I can [capability] so that [benefit]" format.
+        priority:
+          type: integer
+          default: 0
+          description: Priority for ordering. Lower values = implement first.
+        children:
+          type: array
+          default: []
+          description: Child features (for hierarchical structure)
+          items:
+            $ref: '#/components/schemas/ProposedFeature'
+
+    PlanFeaturesResponse:
+      type: object
+      required: [proposed_features, created]
+      description: Response from bulk feature creation
+      properties:
+        proposed_features:
+          type: array
+          description: The proposed feature tree (same as input, for review)
+          items:
+            $ref: '#/components/schemas/ProposedFeature'
+        created:
+          type: boolean
+          description: Whether the features were created (true if confirm=true was passed)
+        created_feature_ids:
+          type: array
+          default: []
+          description: UUIDs of created features (only populated if created=true)
+          items:
+            type: string
+            format: uuid
+
     FeatureTreeNode:
       type: object
       description: A feature with its children recursively nested
@@ -988,7 +1118,7 @@ components:
 
     FeatureHistory:
       type: object
-      required: [id, feature_id, summary, author, created_at]
+      required: [id, feature_id, summary, created_at]
       description: |
         Append-only log entry recording what happened during a session.
         Similar to git log - records implementation history, not version snapshots.
@@ -1006,15 +1136,11 @@ components:
         summary:
           type: string
           description: Summary of work completed
-        files_changed:
+        commits:
           type: array
-          nullable: true
+          description: Git commits created during this work
           items:
-            type: string
-          description: List of files modified during the session
-        author:
-          type: string
-          description: Who or what created this entry (agent name or user)
+            $ref: '#/components/schemas/CommitRef'
         created_at:
           type: string
           format: date-time
@@ -1138,9 +1264,32 @@ components:
         summary:
           type: string
           description: Summary of work completed in this session
+        commits:
+          type: array
+          description: Git commits created during this session
+          items:
+            $ref: '#/components/schemas/CommitRef'
         feature_state:
           $ref: '#/components/schemas/FeatureState'
           description: Optionally update the feature's state (e.g., to 'implemented')
+
+    CommitRef:
+      type: object
+      required: [sha, message]
+      description: Reference to a git commit
+      properties:
+        sha:
+          type: string
+          description: Commit SHA (short or full)
+          example: "abc123f"
+        message:
+          type: string
+          description: Commit message (first line)
+          example: "Add OAuth login flow"
+        author:
+          type: string
+          nullable: true
+          description: Commit author (if different from default)
 
     SessionCompletionResult:
       type: object
