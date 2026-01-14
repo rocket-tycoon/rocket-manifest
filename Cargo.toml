@@ -1,6 +1,6 @@
 [package]
 name = "manifest"
-version = "0.1.14"
+version = "0.1.15"
 edition = "2021"
 description = "Living feature documentation server for AI-assisted development"
 license = "BUSL-1.1"
