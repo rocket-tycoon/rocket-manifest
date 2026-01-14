@@ -134,7 +134,7 @@ Add RocketManifest as an MCP server in your Claude Code configuration:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        SETUP (once)                              │
+│                        SETUP (once)                             │
 ├─────────────────────────────────────────────────────────────────┤
 │  1. create_project("MyApp", instructions="Use TDD...")          │
 │  2. add_project_directory(project_id, "/path/to/myapp")         │
@@ -143,7 +143,7 @@ Add RocketManifest as an MCP server in your Claude Code configuration:
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    DISCOVERY (orchestrator)                      │
+│                    DISCOVERY (orchestrator)                     │
 ├─────────────────────────────────────────────────────────────────┤
 │  4. get_project_context("/path/to/myapp") → instructions        │
 │  5. list_features(state="specified") → find ready work          │
@@ -154,7 +154,7 @@ Add RocketManifest as an MCP server in your Claude Code configuration:
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    BREAKDOWN (orchestrator)                      │
+│                    BREAKDOWN (orchestrator)                     │
 ├─────────────────────────────────────────────────────────────────┤
 │  8. breakdown_feature(feature_id, goal, tasks=[...])            │
 │     → session_id, [task_id_1, task_id_2, ...]                   │
@@ -176,7 +176,7 @@ Add RocketManifest as an MCP server in your Claude Code configuration:
               └───────────────┼───────────────┘
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                   COMPLETION (orchestrator)                      │
+│                   COMPLETION (orchestrator)                     │
 ├─────────────────────────────────────────────────────────────────┤
 │ 10. list_session_tasks(session_id) → all completed?             │
 │ 11. complete_session(session_id, summary, commits)              │
