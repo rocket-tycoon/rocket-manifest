@@ -234,14 +234,14 @@ impl ManifestClient {
     }
 
     /// List all features with optional filtering.
+    /// Always returns summaries only - use get_feature for full details.
     pub async fn list_features(
         &self,
         project_id: Option<Uuid>,
         state: Option<&str>,
-        include_details: bool,
         limit: Option<u32>,
         offset: Option<u32>,
-    ) -> Result<Vec<Feature>, ClientError> {
+    ) -> Result<Vec<FeatureSummary>, ClientError> {
         let mut url = match project_id {
             Some(pid) => format!("/projects/{}/features", pid),
             None => "/features".to_string(),
@@ -249,9 +249,6 @@ impl ManifestClient {
 
         // Build query string
         let mut params = vec![];
-        if include_details {
-            params.push("include_details=true".to_string());
-        }
         if let Some(s) = state {
             params.push(format!("state={}", s));
         }
@@ -265,6 +262,43 @@ impl ManifestClient {
             url.push('?');
             url.push_str(&params.join("&"));
         }
+
+        let response = self.request(reqwest::Method::GET, &url).send().await?;
+        self.handle_response(response).await
+    }
+
+    /// Search features by title and details.
+    /// Returns summaries ranked by relevance.
+    pub async fn search_features(
+        &self,
+        query: &str,
+        project_id: Option<Uuid>,
+        limit: Option<u32>,
+    ) -> Result<Vec<FeatureSummary>, ClientError> {
+        let mut url = "/features/search".to_string();
+
+        // Build query string with manual percent-encoding for the query
+        let encoded_query: String = query
+            .chars()
+            .map(|c| match c {
+                ' ' => "%20".to_string(),
+                '&' => "%26".to_string(),
+                '=' => "%3D".to_string(),
+                '?' => "%3F".to_string(),
+                '#' => "%23".to_string(),
+                '%' => "%25".to_string(),
+                _ => c.to_string(),
+            })
+            .collect();
+        let mut params = vec![format!("q={}", encoded_query)];
+        if let Some(pid) = project_id {
+            params.push(format!("project_id={}", pid));
+        }
+        if let Some(l) = limit {
+            params.push(format!("limit={}", l));
+        }
+        url.push('?');
+        url.push_str(&params.join("&"));
 
         let response = self.request(reqwest::Method::GET, &url).send().await?;
         self.handle_response(response).await

@@ -215,27 +215,21 @@ paths:
       tags: [Features]
       summary: List all features in a project
       description: |
-        Returns features ordered by priority then title. By default returns summary only
-        (id, project_id, parent_id, title, state, priority) to reduce response size.
-        Use include_details=true for full feature details.
+        Returns feature summaries ordered by priority then title.
+        Always returns summaries only - use GET /features/{id} for full details.
       operationId: listProjectFeatures
       parameters:
-        - $ref: '#/components/parameters/IncludeDetails'
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Offset'
       responses:
         '200':
-          description: Features in the project (summary by default, full if include_details=true)
+          description: Feature summaries in the project
           content:
             application/json:
               schema:
-                oneOf:
-                  - type: array
-                    items:
-                      $ref: '#/components/schemas/FeatureSummary'
-                  - type: array
-                    items:
-                      $ref: '#/components/schemas/Feature'
+                type: array
+                items:
+                  $ref: '#/components/schemas/FeatureSummary'
     post:
       tags: [Features]
       summary: Create a feature in a project
@@ -351,27 +345,62 @@ paths:
       tags: [Features]
       summary: List all features across all projects
       description: |
-        Returns features ordered by priority then title. By default returns summary only
-        (id, project_id, parent_id, title, state, priority) to reduce response size.
-        Use include_details=true for full feature details.
+        Returns feature summaries ordered by priority then title.
+        Always returns summaries only - use GET /features/{id} for full details.
       operationId: listFeatures
       parameters:
-        - $ref: '#/components/parameters/IncludeDetails'
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Offset'
       responses:
         '200':
-          description: Features (summary by default, full if include_details=true)
+          description: Feature summaries
           content:
             application/json:
               schema:
-                oneOf:
-                  - type: array
-                    items:
-                      $ref: '#/components/schemas/FeatureSummary'
-                  - type: array
-                    items:
-                      $ref: '#/components/schemas/Feature'
+                type: array
+                items:
+                  $ref: '#/components/schemas/FeatureSummary'
+
+  /features/search:
+    get:
+      tags: [Features]
+      summary: Search features by title or content
+      description: |
+        Search features by matching against title and details.
+        Returns summaries ranked by relevance (title matches first).
+        Use GET /features/{id} for full details of a specific result.
+      operationId: searchFeatures
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search term to match against title and details
+        - name: project_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Optional project UUID to limit search to
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+          description: Maximum number of results to return. Defaults to 10.
+      responses:
+        '200':
+          description: Feature summaries matching the search query, ranked by relevance
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FeatureSummary'
 
   /features/{id}:
     parameters:
@@ -749,15 +778,6 @@ components:
         type: string
         format: uuid
       description: Task UUID
-
-    IncludeDetails:
-      name: include_details
-      in: query
-      required: false
-      schema:
-        type: boolean
-        default: false
-      description: Include full details in response. Defaults to false (summary mode) to reduce response size.
 
     Limit:
       name: limit

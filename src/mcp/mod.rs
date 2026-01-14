@@ -341,7 +341,7 @@ impl McpServer {
     // ============================================================
 
     #[tool(
-        description = "List features, optionally filtered by project or state. Use this to discover what features exist and their current state. Returns features ordered by priority then title. By default returns summary only (id, title, state, priority, parent_id) to reduce response size. Use include_details=true for full feature details."
+        description = "List features, optionally filtered by project or state. Returns summaries only (id, title, state, priority, parent_id). Use get_feature for full details of a specific feature."
     )]
     async fn list_features(
         &self,
@@ -355,45 +355,70 @@ impl McpServer {
             None => None,
         };
 
-        // Get features via HTTP client (always request full details, convert to summary in MCP if needed)
+        // Get features via HTTP client (always returns summaries)
         let features = self
             .client
-            .list_features(
-                project_id,
-                req.state.as_deref(),
-                true,
-                req.limit,
-                req.offset,
-            )
+            .list_features(project_id, req.state.as_deref(), req.limit, req.offset)
             .await
             .map_err(Self::client_err)?;
 
-        // Return summary or full details based on include_details flag
-        let json = if req.include_details {
-            let result = FeatureListResponse {
-                features: features
-                    .iter()
-                    .map(ManifestClient::feature_to_info)
-                    .collect(),
-            };
-            serde_json::to_string_pretty(&result)
-        } else {
-            let result = FeatureListSummaryResponse {
-                features: features
-                    .into_iter()
-                    .map(|f| FeatureSummaryInfo {
-                        id: f.id.to_string(),
-                        title: f.title,
-                        state: f.state.as_str().to_string(),
-                        priority: f.priority,
-                        parent_id: f.parent_id.map(|id| id.to_string()),
-                    })
-                    .collect(),
-            };
-            serde_json::to_string_pretty(&result)
+        // Always return summaries only
+        let result = FeatureListSummaryResponse {
+            features: features
+                .into_iter()
+                .map(|f| FeatureSummaryInfo {
+                    id: f.id.to_string(),
+                    title: f.title,
+                    state: f.state.as_str().to_string(),
+                    priority: f.priority,
+                    parent_id: f.parent_id.map(|id| id.to_string()),
+                })
+                .collect(),
         };
 
-        let json = json.map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        let json = serde_json::to_string_pretty(&result)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(CallToolResult::success(vec![Content::text(json)]))
+    }
+
+    #[tool(
+        description = "Search features by title or content. Use this to find specific features without listing all of them. Returns summaries ranked by relevance. Use get_feature for full details."
+    )]
+    async fn search_features(
+        &self,
+        params: Parameters<SearchFeaturesRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let req = params.0;
+
+        // Parse project_id if provided
+        let project_id = match req.project_id {
+            Some(ref pid) => Some(Self::parse_uuid(pid)?),
+            None => None,
+        };
+
+        // Get features via HTTP client
+        let features = self
+            .client
+            .search_features(&req.query, project_id, req.limit)
+            .await
+            .map_err(Self::client_err)?;
+
+        let result = FeatureListSummaryResponse {
+            features: features
+                .into_iter()
+                .map(|f| FeatureSummaryInfo {
+                    id: f.id.to_string(),
+                    title: f.title,
+                    state: f.state.as_str().to_string(),
+                    priority: f.priority,
+                    parent_id: f.parent_id.map(|id| id.to_string()),
+                })
+                .collect(),
+        };
+
+        let json = serde_json::to_string_pretty(&result)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
 
         Ok(CallToolResult::success(vec![Content::text(json)]))
     }

@@ -548,6 +548,72 @@ impl Database {
         Ok(count == 0)
     }
 
+    /// Search features by title and details.
+    /// Returns summaries ranked by relevance (title matches first, then details matches).
+    pub fn search_features(
+        &self,
+        query: &str,
+        project_id: Option<Uuid>,
+        limit: Option<u32>,
+    ) -> Result<Vec<FeatureSummary>> {
+        let conn = self.conn.lock().expect("database lock poisoned");
+
+        // Use LIKE for case-insensitive search
+        // Ranking: title matches get higher priority than details matches
+        let search_pattern = format!("%{}%", query);
+        let limit_val = limit.unwrap_or(10) as i64;
+
+        let (sql, params): (String, Vec<Box<dyn rusqlite::ToSql>>) = match project_id {
+            Some(pid) => (
+                "SELECT id, project_id, parent_id, title, state, priority
+                 FROM features
+                 WHERE project_id = ?1 AND (title LIKE ?2 OR details LIKE ?2)
+                 ORDER BY
+                     CASE WHEN title LIKE ?2 THEN 0 ELSE 1 END,
+                     priority,
+                     title
+                 LIMIT ?3"
+                    .to_string(),
+                vec![
+                    Box::new(pid.to_string()),
+                    Box::new(search_pattern),
+                    Box::new(limit_val),
+                ],
+            ),
+            None => (
+                "SELECT id, project_id, parent_id, title, state, priority
+                 FROM features
+                 WHERE title LIKE ?1 OR details LIKE ?1
+                 ORDER BY
+                     CASE WHEN title LIKE ?1 THEN 0 ELSE 1 END,
+                     priority,
+                     title
+                 LIMIT ?2"
+                    .to_string(),
+                vec![Box::new(search_pattern), Box::new(limit_val)],
+            ),
+        };
+
+        let params_ref: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        let mut stmt = conn.prepare(&sql)?;
+
+        let features = stmt
+            .query_map(params_ref.as_slice(), |row| {
+                Ok(FeatureSummary {
+                    id: parse_uuid(row.get::<_, String>(0)?),
+                    project_id: parse_uuid(row.get::<_, String>(1)?),
+                    parent_id: row.get::<_, Option<String>>(2)?.map(parse_uuid),
+                    title: row.get(3)?,
+                    state: FeatureState::from_str(&row.get::<_, String>(4)?)
+                        .unwrap_or(FeatureState::Proposed),
+                    priority: row.get(5)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(features)
+    }
+
     pub fn get_feature_tree(&self, project_id: Uuid) -> Result<Vec<FeatureTreeNode>> {
         let features = self.get_features_by_project(project_id)?;
 

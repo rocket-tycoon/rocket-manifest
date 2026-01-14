@@ -85,6 +85,7 @@ pub fn create_router_with_config(db: Database, config: SecurityConfig) -> Router
         )
         // Features (by feature id)
         .route("/features", get(handlers::list_features))
+        .route("/features/search", get(handlers::search_features))
         .route("/features/{id}", get(handlers::get_feature))
         .route("/features/{id}", put(handlers::update_feature))
         .route("/features/{id}", delete(handlers::delete_feature))

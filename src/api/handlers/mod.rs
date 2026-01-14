@@ -140,7 +140,7 @@ pub async fn remove_project_directory(
 pub async fn list_features(
     State(db): State<Database>,
     Query(query): Query<ListFeaturesQuery>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+) -> Result<Json<Vec<FeatureSummary>>, (StatusCode, String)> {
     let features = db.get_all_features().map_err(internal_error)?;
 
     // Apply pagination
@@ -151,20 +151,16 @@ pub async fn list_features(
         None => features,
     };
 
-    // Return summary or full details
-    if query.include_details {
-        Ok(Json(serde_json::to_value(features).unwrap()))
-    } else {
-        let summaries: Vec<FeatureSummary> = features.into_iter().map(Into::into).collect();
-        Ok(Json(serde_json::to_value(summaries).unwrap()))
-    }
+    // Always return summaries only - use get_feature for full details
+    let summaries: Vec<FeatureSummary> = features.into_iter().map(Into::into).collect();
+    Ok(Json(summaries))
 }
 
 pub async fn list_project_features(
     State(db): State<Database>,
     Path(project_id): Path<Uuid>,
     Query(query): Query<ListFeaturesQuery>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+) -> Result<Json<Vec<FeatureSummary>>, (StatusCode, String)> {
     let features = db
         .get_features_by_project(project_id)
         .map_err(internal_error)?;
@@ -177,13 +173,9 @@ pub async fn list_project_features(
         None => features,
     };
 
-    // Return summary or full details
-    if query.include_details {
-        Ok(Json(serde_json::to_value(features).unwrap()))
-    } else {
-        let summaries: Vec<FeatureSummary> = features.into_iter().map(Into::into).collect();
-        Ok(Json(serde_json::to_value(summaries).unwrap()))
-    }
+    // Always return summaries only - use get_feature for full details
+    let summaries: Vec<FeatureSummary> = features.into_iter().map(Into::into).collect();
+    Ok(Json(summaries))
 }
 
 pub async fn list_root_features(
@@ -306,6 +298,28 @@ pub async fn delete_feature(
     } else {
         Err((StatusCode::NOT_FOUND, "Feature not found".to_string()))
     }
+}
+
+/// Query parameters for searching features.
+#[derive(Debug, Deserialize)]
+pub struct SearchFeaturesQuery {
+    /// Search term to match against title and details.
+    pub q: String,
+    /// Optional project UUID to limit search to.
+    pub project_id: Option<Uuid>,
+    /// Maximum number of results to return. Defaults to 10.
+    pub limit: Option<u32>,
+}
+
+/// Search features by title and details.
+/// Returns summaries ranked by relevance.
+pub async fn search_features(
+    State(db): State<Database>,
+    Query(query): Query<SearchFeaturesQuery>,
+) -> Result<Json<Vec<FeatureSummary>>, (StatusCode, String)> {
+    db.search_features(&query.q, query.project_id, query.limit)
+        .map(Json)
+        .map_err(internal_error)
 }
 
 // ============================================================

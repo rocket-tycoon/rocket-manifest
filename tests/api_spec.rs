@@ -874,10 +874,11 @@ mod features {
             })
             .await;
 
-        let response = server.get("/api/v1/features?include_details=true").await;
+        // list_features always returns summaries - use get_feature for full details
+        let response = server.get("/api/v1/features").await;
 
         response.assert_status_ok();
-        let features: Vec<Feature> = response.json();
+        let features: Vec<FeatureSummary> = response.json();
         assert_eq!(features.len(), 2);
     }
 
@@ -974,6 +975,182 @@ mod features {
             .await;
 
         response.assert_status_not_found();
+    }
+}
+
+// ============================================================
+// Feature Search
+// ============================================================
+
+mod feature_search {
+    use super::*;
+
+    #[tokio::test]
+    async fn returns_empty_list_when_no_matches() {
+        let server = setup();
+        let project = create_test_project(&server).await;
+
+        server
+            .post(&format!("/api/v1/projects/{}/features", project.id))
+            .json(&CreateFeatureInput {
+                parent_id: None,
+                title: "User Login".to_string(),
+                details: None,
+                priority: None,
+                state: None,
+            })
+            .await;
+
+        let response = server.get("/api/v1/features/search?q=nonexistent").await;
+
+        response.assert_status_ok();
+        let features: Vec<FeatureSummary> = response.json();
+        assert!(features.is_empty());
+    }
+
+    #[tokio::test]
+    async fn finds_features_matching_title() {
+        let server = setup();
+        let project = create_test_project(&server).await;
+
+        server
+            .post(&format!("/api/v1/projects/{}/features", project.id))
+            .json(&CreateFeatureInput {
+                parent_id: None,
+                title: "User Authentication".to_string(),
+                details: None,
+                priority: None,
+                state: None,
+            })
+            .await;
+
+        server
+            .post(&format!("/api/v1/projects/{}/features", project.id))
+            .json(&CreateFeatureInput {
+                parent_id: None,
+                title: "Payment Processing".to_string(),
+                details: None,
+                priority: None,
+                state: None,
+            })
+            .await;
+
+        let response = server.get("/api/v1/features/search?q=user").await;
+
+        response.assert_status_ok();
+        let features: Vec<FeatureSummary> = response.json();
+        assert_eq!(features.len(), 1);
+        assert_eq!(features[0].title, "User Authentication");
+    }
+
+    #[tokio::test]
+    async fn finds_features_matching_details() {
+        let server = setup();
+        let project = create_test_project(&server).await;
+
+        server
+            .post(&format!("/api/v1/projects/{}/features", project.id))
+            .json(&CreateFeatureInput {
+                parent_id: None,
+                title: "OAuth Integration".to_string(),
+                details: Some("Implement Google OAuth using PKCE flow".to_string()),
+                priority: None,
+                state: None,
+            })
+            .await;
+
+        let response = server.get("/api/v1/features/search?q=PKCE").await;
+
+        response.assert_status_ok();
+        let features: Vec<FeatureSummary> = response.json();
+        assert_eq!(features.len(), 1);
+        assert_eq!(features[0].title, "OAuth Integration");
+    }
+
+    #[tokio::test]
+    async fn respects_limit_parameter() {
+        let server = setup();
+        let project = create_test_project(&server).await;
+
+        for i in 1..=5 {
+            server
+                .post(&format!("/api/v1/projects/{}/features", project.id))
+                .json(&CreateFeatureInput {
+                    parent_id: None,
+                    title: format!("Feature {}", i),
+                    details: None,
+                    priority: None,
+                    state: None,
+                })
+                .await;
+        }
+
+        let response = server
+            .get("/api/v1/features/search?q=Feature&limit=2")
+            .await;
+
+        response.assert_status_ok();
+        let features: Vec<FeatureSummary> = response.json();
+        assert_eq!(features.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn filters_by_project_id() {
+        let server = setup();
+
+        let project1 = server
+            .post("/api/v1/projects")
+            .json(&CreateProjectInput {
+                name: "Project 1".to_string(),
+                description: None,
+                instructions: None,
+            })
+            .await
+            .json::<Project>();
+
+        let project2 = server
+            .post("/api/v1/projects")
+            .json(&CreateProjectInput {
+                name: "Project 2".to_string(),
+                description: None,
+                instructions: None,
+            })
+            .await
+            .json::<Project>();
+
+        server
+            .post(&format!("/api/v1/projects/{}/features", project1.id))
+            .json(&CreateFeatureInput {
+                parent_id: None,
+                title: "Auth in Project 1".to_string(),
+                details: None,
+                priority: None,
+                state: None,
+            })
+            .await;
+
+        server
+            .post(&format!("/api/v1/projects/{}/features", project2.id))
+            .json(&CreateFeatureInput {
+                parent_id: None,
+                title: "Auth in Project 2".to_string(),
+                details: None,
+                priority: None,
+                state: None,
+            })
+            .await;
+
+        let response = server
+            .get(&format!(
+                "/api/v1/features/search?q=Auth&project_id={}",
+                project1.id
+            ))
+            .await;
+
+        response.assert_status_ok();
+        let features: Vec<FeatureSummary> = response.json();
+        assert_eq!(features.len(), 1);
+        assert_eq!(features[0].title, "Auth in Project 1");
     }
 }
 

@@ -101,15 +101,20 @@ pub struct ListFeaturesRequest {
         description = "Optional state filter: 'proposed', 'specified', 'implemented', or 'deprecated'"
     )]
     pub state: Option<String>,
-    #[schemars(
-        description = "Include full details in response. Defaults to false (summary mode) to reduce response size."
-    )]
-    #[serde(default)]
-    pub include_details: bool,
     #[schemars(description = "Maximum number of features to return. Defaults to no limit.")]
     pub limit: Option<u32>,
     #[schemars(description = "Number of features to skip for pagination. Defaults to 0.")]
     pub offset: Option<u32>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct SearchFeaturesRequest {
+    #[schemars(description = "Search term to match against title and details")]
+    pub query: String,
+    #[schemars(description = "Optional project UUID to limit search to a specific project")]
+    pub project_id: Option<String>,
+    #[schemars(description = "Maximum number of results to return. Defaults to 10.")]
+    pub limit: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]

@@ -415,6 +415,168 @@ speculate! {
             }
 
         }
+
+        describe "search_features" {
+            it "returns empty list when no matches" {
+                let project = create_test_project(&db);
+                db.create_feature(project.id, CreateFeatureInput {
+                    parent_id: None,
+                    title: "User Login".to_string(),
+                    details: None,
+                    priority: None,
+                    state: None,
+                }).expect("Failed to create");
+
+                let results = db.search_features("nonexistent", None, None).expect("Query failed");
+                assert!(results.is_empty());
+            }
+
+            it "matches title case-insensitively" {
+                let project = create_test_project(&db);
+                db.create_feature(project.id, CreateFeatureInput {
+                    parent_id: None,
+                    title: "User Authentication".to_string(),
+                    details: None,
+                    priority: None,
+                    state: None,
+                }).expect("Failed to create");
+
+                let results = db.search_features("user", None, None).expect("Query failed");
+                assert_eq!(results.len(), 1);
+                assert_eq!(results[0].title, "User Authentication");
+
+                let results = db.search_features("USER", None, None).expect("Query failed");
+                assert_eq!(results.len(), 1);
+            }
+
+            it "matches details content" {
+                let project = create_test_project(&db);
+                db.create_feature(project.id, CreateFeatureInput {
+                    parent_id: None,
+                    title: "OAuth Integration".to_string(),
+                    details: Some("Implement Google OAuth using PKCE flow".to_string()),
+                    priority: None,
+                    state: None,
+                }).expect("Failed to create");
+
+                let results = db.search_features("PKCE", None, None).expect("Query failed");
+                assert_eq!(results.len(), 1);
+                assert_eq!(results[0].title, "OAuth Integration");
+            }
+
+            it "ranks title matches before details matches" {
+                let project = create_test_project(&db);
+                db.create_feature(project.id, CreateFeatureInput {
+                    parent_id: None,
+                    title: "User Login".to_string(),
+                    details: Some("Some login details".to_string()),
+                    priority: None,
+                    state: None,
+                }).expect("Failed to create");
+
+                db.create_feature(project.id, CreateFeatureInput {
+                    parent_id: None,
+                    title: "OAuth Flow".to_string(),
+                    details: Some("User must click login button".to_string()),
+                    priority: None,
+                    state: None,
+                }).expect("Failed to create");
+
+                let results = db.search_features("login", None, None).expect("Query failed");
+                assert_eq!(results.len(), 2);
+                // "User Login" should be first (title match)
+                assert_eq!(results[0].title, "User Login");
+                // "OAuth Flow" should be second (details match)
+                assert_eq!(results[1].title, "OAuth Flow");
+            }
+
+            it "filters by project_id" {
+                let project1 = db.create_project(CreateProjectInput {
+                    name: "Project 1".to_string(),
+                    description: None,
+                    instructions: None,
+                }).expect("Failed to create project");
+
+                let project2 = db.create_project(CreateProjectInput {
+                    name: "Project 2".to_string(),
+                    description: None,
+                    instructions: None,
+                }).expect("Failed to create project");
+
+                db.create_feature(project1.id, CreateFeatureInput {
+                    parent_id: None,
+                    title: "Auth Feature".to_string(),
+                    details: None,
+                    priority: None,
+                    state: None,
+                }).expect("Failed to create");
+
+                db.create_feature(project2.id, CreateFeatureInput {
+                    parent_id: None,
+                    title: "Auth in Project 2".to_string(),
+                    details: None,
+                    priority: None,
+                    state: None,
+                }).expect("Failed to create");
+
+                let results = db.search_features("Auth", Some(project1.id), None).expect("Query failed");
+                assert_eq!(results.len(), 1);
+                assert_eq!(results[0].title, "Auth Feature");
+            }
+
+            it "respects limit parameter" {
+                let project = create_test_project(&db);
+                for i in 1..=5 {
+                    db.create_feature(project.id, CreateFeatureInput {
+                        parent_id: None,
+                        title: format!("Feature {}", i),
+                        details: None,
+                        priority: None,
+                        state: None,
+                    }).expect("Failed to create");
+                }
+
+                let results = db.search_features("Feature", None, Some(2)).expect("Query failed");
+                assert_eq!(results.len(), 2);
+            }
+
+            it "defaults limit to 10" {
+                let project = create_test_project(&db);
+                for i in 1..=15 {
+                    db.create_feature(project.id, CreateFeatureInput {
+                        parent_id: None,
+                        title: format!("Feature {}", i),
+                        details: None,
+                        priority: None,
+                        state: None,
+                    }).expect("Failed to create");
+                }
+
+                let results = db.search_features("Feature", None, None).expect("Query failed");
+                assert_eq!(results.len(), 10);
+            }
+
+            it "returns FeatureSummary not full Feature" {
+                let project = create_test_project(&db);
+                let feature = db.create_feature(project.id, CreateFeatureInput {
+                    parent_id: None,
+                    title: "Test Feature".to_string(),
+                    details: Some("Detailed description".to_string()),
+                    priority: Some(5),
+                    state: Some(FeatureState::Specified),
+                }).expect("Failed to create");
+
+                let results = db.search_features("Test", None, None).expect("Query failed");
+                assert_eq!(results.len(), 1);
+
+                let summary = &results[0];
+                assert_eq!(summary.id, feature.id);
+                assert_eq!(summary.title, "Test Feature");
+                assert_eq!(summary.state, FeatureState::Specified);
+                assert_eq!(summary.priority, 5);
+                // FeatureSummary doesn't have details field - that's the point!
+            }
+        }
     }
 
     describe "feature_hierarchy" {

@@ -154,9 +154,6 @@ impl From<Feature> for FeatureSummary {
 /// Query parameters for listing features.
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct ListFeaturesQuery {
-    /// Include full details in response. Defaults to false (summary mode).
-    #[serde(default)]
-    pub include_details: bool,
     /// Maximum number of features to return.
     pub limit: Option<u32>,
     /// Number of features to skip for pagination.
