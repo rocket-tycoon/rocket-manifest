@@ -1,5 +1,5 @@
-use rocket_manifest::db::Database;
-use rocket_manifest::models::*;
+use manifest::db::Database;
+use manifest::models::*;
 use speculate2::speculate;
 use uuid::Uuid;
 

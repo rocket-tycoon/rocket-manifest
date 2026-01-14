@@ -1,8 +1,8 @@
 use axum::http::StatusCode;
 use axum_test::TestServer;
-use rocket_manifest::api::create_router;
-use rocket_manifest::db::Database;
-use rocket_manifest::models::*;
+use manifest::api::create_router;
+use manifest::db::Database;
+use manifest::models::*;
 
 fn setup() -> TestServer {
     let db = Database::open_memory().expect("Failed to create database");
@@ -1900,7 +1900,7 @@ mod feature_sessions {
 
 mod security_auth {
     use super::*;
-    use rocket_manifest::api::{create_router_with_config, SecurityConfig};
+    use manifest::api::{create_router_with_config, SecurityConfig};
 
     fn setup_with_auth(api_key: &str) -> TestServer {
         let db = Database::open_memory().expect("Failed to create database");

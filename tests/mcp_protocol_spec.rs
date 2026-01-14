@@ -1,6 +1,6 @@
 //! MCP protocol integration tests.
 //!
-//! These tests spawn the actual `rmf mcp` process and communicate via
+//! These tests spawn the actual `mfst mcp` process and communicate via
 //! JSON-RPC over stdio, testing the complete MCP protocol flow.
 //!
 //! The rmcp library uses line-delimited JSON (each message is one line):
@@ -58,7 +58,7 @@ impl McpTestClient {
         // Create temp directory for test database
         let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
 
-        let mut child = Command::new(env!("CARGO_BIN_EXE_rmf"))
+        let mut child = Command::new(env!("CARGO_BIN_EXE_mfst"))
             .arg("mcp")
             .env("XDG_DATA_HOME", temp_dir.path())
             .env("HOME", temp_dir.path()) // For macOS directories crate
@@ -66,7 +66,7 @@ impl McpTestClient {
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .spawn()
-            .expect("Failed to spawn rmf mcp");
+            .expect("Failed to spawn mfst mcp");
 
         let stdout = child.stdout.take().expect("Failed to get stdout");
         let reader = BufReader::new(stdout);
