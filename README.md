@@ -1,17 +1,17 @@
-# RocketManifest
+# Manifest
 
 Living feature documentation for AI-assisted development.
 
-RocketManifest is an MCP server and HTTP API that tracks **features** (system capabilities) rather than work items. Unlike traditional issue trackers where items are closed and forgotten, features are living descriptions that evolve with your codebase.
+Manifest is an MCP server and HTTP API that tracks **features** (system capabilities) rather than work items. Unlike traditional issue trackers where items are closed and forgotten, features are living descriptions that evolve with your codebase.
 
 ## Quick Start
 
 ```bash
 # Start the server
-rocket-manifest serve
+mfst serve
 
 # Or run as MCP server for Claude Code
-rocket-manifest mcp
+mfst mcp
 ```
 
 ## Installation
@@ -19,15 +19,15 @@ rocket-manifest mcp
 ### From Source
 
 ```bash
-git clone https://github.com/rocket-tycoon/rocket-manifest
-cd rocket-manifest
+git clone https://github.com/rocket-tycoon/manifest
+cd manifest
 cargo install --path .
 ```
 
 ### Homebrew (coming soon)
 
 ```bash
-brew install rocket-tycoon/tap/rocket-manifest
+brew install rocket-tycoon/tap/manifest
 ```
 
 ## Core Concepts
@@ -42,8 +42,8 @@ brew install rocket-tycoon/tap/rocket-manifest
 ### Feature Lifecycle
 
 ```
-Traditional Tools          RocketManifest
-─────────────────          ──────────────
+Traditional Tools          Manifest
+─────────────────          ────────
 Issue (work item)    →     Feature (system capability)
 Open → Closed        →     Proposed → Implemented → Living
 Changelog of what    →     Description of what IS
@@ -60,30 +60,30 @@ Features are not work items to be closed. They are living documentation that evo
 
 ```bash
 # Start HTTP server on default port (17010)
-rocket-manifest serve
+mfst serve
 
 # Start on custom port
-rocket-manifest serve -p 8080
+mfst serve -p 8080
 
 # Start MCP server via stdio (for Claude Code)
-rocket-manifest mcp
+mfst mcp
 
 # Check server status
-rocket-manifest status
+mfst status
 
 # Stop the server
-rocket-manifest stop
+mfst stop
 ```
 
 ## Claude Code Integration
 
-Add RocketManifest as an MCP server in your Claude Code configuration:
+Add Manifest as an MCP server in your Claude Code configuration:
 
 ```json
 {
   "mcpServers": {
-    "rocket-manifest": {
-      "command": "rocket-manifest",
+    "manifest": {
+      "command": "mfst",
       "args": ["mcp"]
     }
   }
@@ -251,9 +251,9 @@ curl -X POST http://localhost:17010/api/v1/sessions \
 
 | Platform | Location |
 |----------|----------|
-| macOS | `~/.local/share/rocket-manifest/manifest.db` |
-| Linux | `~/.local/share/rocket-manifest/manifest.db` |
-| Windows | `%APPDATA%\rocket-manifest\manifest.db` |
+| macOS | `~/.local/share/manifest/manifest.db` |
+| Linux | `~/.local/share/manifest/manifest.db` |
+| Windows | `%APPDATA%\manifest\manifest.db` |
 
 The database auto-migrates on startup.
 

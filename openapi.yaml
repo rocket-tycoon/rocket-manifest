@@ -1,10 +1,10 @@
 openapi: 3.1.0
 info:
-  title: RocketManifest API
+  title: Manifest API
   description: |
     Living feature documentation server for AI-assisted development.
 
-    RocketManifest tracks **features** (system capabilities) rather than work items.
+    Manifest tracks **features** (system capabilities) rather than work items.
     Features are living descriptions that evolve with the codebase, organized in a
     hierarchical tree structure under projects.
 
@@ -19,7 +19,7 @@ info:
   license:
     name: MIT
   contact:
-    name: RocketManifest
+    name: Manifest
 
 servers:
   - url: http://localhost:17010/api/v1
@@ -827,7 +827,7 @@ components:
           format: uuid
         name:
           type: string
-          example: "RocketManifest"
+          example: "Manifest"
         description:
           type: string
           nullable: true

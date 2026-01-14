@@ -6,14 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-RocketManifest (formerly "Legion") is an MCP server for living feature documentation. It was extracted from the RocketCrew VSCode extension to provide a standalone backend for technical product management.
+Manifest (formerly "RocketManifest", "Legion") is an MCP server for living feature documentation. It was extracted from the RocketCrew VSCode extension to provide a standalone backend for technical product management.
 
 ### Core Philosophy: Features as Living Documentation
 
-Unlike JIRA/Linear which track **work items** that accumulate as closed history, RocketManifest tracks **features** that describe the current state of the system:
+Unlike JIRA/Linear which track **work items** that accumulate as closed history, Manifest tracks **features** that describe the current state of the system:
 
-| Traditional Tools | RocketManifest |
-|-------------------|----------------|
+| Traditional Tools | Manifest |
+|-------------------|----------|
 | Issue (work item) | Feature (system capability) |
 | Open → Closed → Forgotten | Proposed → Implemented → **Living** |
 | Changelog of what happened | Description of what IS |
@@ -27,7 +27,7 @@ AI agents access features through deterministic MCP tools (not grep):
 - `start_task` - Signal work is beginning
 - `complete_task` - Mark task as complete
 
-Agents are scoped to their assigned task and report progress back. Tasks are small units of work (1-3 story points). AI agents manage their own internal punch lists without RocketManifest tracking granular sub-items.
+Agents are scoped to their assigned task and report progress back. Tasks are small units of work (1-3 story points). AI agents manage their own internal punch lists without Manifest tracking granular sub-items.
 
 ## Build & Test
 
@@ -138,7 +138,7 @@ All routes prefixed with `/api/v1`:
 
 ### Database
 
-- Location: `~/.local/share/rocket-manifest/manifest.db` (via `directories` crate)
+- Location: `~/.local/share/manifest/manifest.db` (via `directories` crate)
 - Schema auto-migrates on startup via `db.migrate()`
 - All IDs stored as TEXT (UUIDs), dates as RFC3339 strings, content as JSON
 
