@@ -11,7 +11,7 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RMF_BIN="$SCRIPT_DIR/rmf"
-VERSION="0.1.12"
+VERSION="0.1.13"
 
 # Detect platform
 case "$(uname -s)" in
