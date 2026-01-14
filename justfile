@@ -59,3 +59,7 @@ clean:
 
 # Run all CI checks (format, lint, test)
 ci: fmt-check lint test
+
+# Publish a new version (bumps version, tags, pushes, triggers release workflow)
+publish version:
+    ./scripts/release.sh {{version}}
