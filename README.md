@@ -90,44 +90,98 @@ Add RocketManifest as an MCP server in your Claude Code configuration:
 }
 ```
 
-### MCP Tools
+### MCP Tools (18 total)
 
-**Agent Tools** (for AI agents working on assigned tasks):
+**Setup Tools** (one-time project initialization):
 
 | Tool | Description |
 |------|-------------|
-| `get_task_context` | Get your assigned task with full feature context. Call this FIRST. |
-| `start_task` | Signal you're beginning work. Sets status to `running`. |
-| `add_implementation_note` | Document decisions, progress, or blockers. |
-| `complete_task` | Signal task is finished. Only call when verified. |
+| `create_project` | Create a project container for features. |
+| `add_project_directory` | Link a filesystem path to a project. |
+| `create_feature` | Define a single system capability. |
+| `plan_features` | Define an entire feature tree in one call. |
 
-**Orchestrator Tools** (for managing sessions and tasks):
+**Discovery Tools** (find what to work on):
+
+| Tool | Description |
+|------|-------------|
+| `get_project_context` | Get project info from a directory path. |
+| `list_features` | Browse features with filters. Returns summaries only. |
+| `search_features` | Find features by keyword. Returns ranked summaries. |
+| `get_feature` | Get full details of a specific feature. |
+| `get_feature_history` | View past implementation sessions. |
+| `update_feature_state` | Transition feature through lifecycle. |
+
+**Orchestrator Tools** (manage sessions and tasks):
 
 | Tool | Description |
 |------|-------------|
 | `create_session` | Start work session on a leaf feature. |
 | `create_task` | Create a task within a session. |
+| `breakdown_feature` | Create session + tasks in one call. |
 | `list_session_tasks` | Monitor progress of all tasks. |
-| `complete_session` | Finalize session, mark feature as implemented. |
+| `complete_session` | Finalize session, create history entry. |
 
-### Agent Workflow
+**Agent Tools** (execute assigned work):
 
-```
-1. get_task_context    → Understand the assignment
-2. start_task          → Signal work is beginning
-3. [implement]         → Write code, run tests
-4. add_implementation_note → Document what was done
-5. complete_task       → Signal completion
-```
+| Tool | Description |
+|------|-------------|
+| `get_task_context` | Get assigned task with full feature context. Call FIRST. |
+| `start_task` | Signal work is beginning. Sets status to `running`. |
+| `complete_task` | Signal task is finished. Only call when verified. |
 
-### Orchestrator Workflow
+### Complete Workflow
 
 ```
-1. create_session      → Start work on a feature
-2. create_task (×N)    → Break work into agent-sized units
-3. [spawn agents]      → Each agent gets a task_id
-4. list_session_tasks  → Monitor progress
-5. complete_session    → Finalize and mark implemented
+┌─────────────────────────────────────────────────────────────────┐
+│                        SETUP (once)                              │
+├─────────────────────────────────────────────────────────────────┤
+│  1. create_project("MyApp", instructions="Use TDD...")          │
+│  2. add_project_directory(project_id, "/path/to/myapp")         │
+│  3. plan_features(project_id, features=[...], confirm=true)     │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    DISCOVERY (orchestrator)                      │
+├─────────────────────────────────────────────────────────────────┤
+│  4. get_project_context("/path/to/myapp") → instructions        │
+│  5. list_features(state="specified") → find ready work          │
+│     - OR search_features(query) → find specific feature         │
+│  6. get_feature(feature_id) → read full specification           │
+│  7. get_feature_history(feature_id) → review past work          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    BREAKDOWN (orchestrator)                      │
+├─────────────────────────────────────────────────────────────────┤
+│  8. breakdown_feature(feature_id, goal, tasks=[...])            │
+│     → session_id, [task_id_1, task_id_2, ...]                   │
+│  9. Spawn agents with task IDs                                  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│   AGENT 1       │ │   AGENT 2       │ │   AGENT 3       │
+├─────────────────┤ ├─────────────────┤ ├─────────────────┤
+│ get_task_context│ │ get_task_context│ │ get_task_context│
+│ start_task      │ │ start_task      │ │ start_task      │
+│ [write code]    │ │ [write code]    │ │ [write code]    │
+│ [run tests]     │ │ [run tests]     │ │ [run tests]     │
+│ complete_task   │ │ complete_task   │ │ complete_task   │
+└─────────────────┘ └─────────────────┘ └─────────────────┘
+              │               │               │
+              └───────────────┼───────────────┘
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   COMPLETION (orchestrator)                      │
+├─────────────────────────────────────────────────────────────────┤
+│ 10. list_session_tasks(session_id) → all completed?             │
+│ 11. complete_session(session_id, summary, commits)              │
+│     → feature marked "implemented", history created             │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ## HTTP API
