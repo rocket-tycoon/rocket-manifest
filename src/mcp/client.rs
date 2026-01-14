@@ -151,6 +151,16 @@ impl ManifestClient {
         feature_id: Uuid,
         goal: &str,
     ) -> Result<SessionResponse, ClientError> {
+        self.create_session_with_tasks(feature_id, goal, &[]).await
+    }
+
+    /// Create a new session on a feature with initial tasks.
+    pub async fn create_session_with_tasks(
+        &self,
+        feature_id: Uuid,
+        goal: &str,
+        tasks: &[CreateTaskInput],
+    ) -> Result<SessionResponse, ClientError> {
         let response = self
             .request(
                 reqwest::Method::POST,
@@ -158,7 +168,7 @@ impl ManifestClient {
             )
             .json(&serde_json::json!({
                 "goal": goal,
-                "tasks": []
+                "tasks": tasks
             }))
             .send()
             .await?;

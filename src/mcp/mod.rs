@@ -242,6 +242,72 @@ impl McpServer {
     }
 
     #[tool(
+        description = "Break down a feature into tasks by creating a session with multiple tasks in one call. Use this after analyzing a feature to create agent-sized work units. Each task should be completable by one agent (1-3 story points). Returns the session and task IDs for spawning agents. This is more efficient than calling create_session then create_task multiple times."
+    )]
+    async fn breakdown_feature(
+        &self,
+        params: Parameters<BreakdownFeatureRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let req = params.0;
+        let feature_id = Self::parse_uuid(&req.feature_id)?;
+
+        // Convert TaskInputItem to CreateTaskInput
+        let tasks: Result<Vec<CreateTaskInput>, McpError> = req
+            .tasks
+            .into_iter()
+            .map(|t| {
+                let agent_type = AgentType::from_str(&t.agent_type).map_err(|_| {
+                    McpError::invalid_params(
+                        format!(
+                            "Invalid agent_type '{}'. Must be: claude, gemini, or codex",
+                            t.agent_type
+                        ),
+                        None,
+                    )
+                })?;
+                Ok(CreateTaskInput {
+                    parent_id: None,
+                    title: t.title,
+                    scope: t.scope,
+                    agent_type,
+                })
+            })
+            .collect();
+        let tasks = tasks?;
+
+        let response = self
+            .client
+            .create_session_with_tasks(feature_id, &req.goal, &tasks)
+            .await
+            .map_err(Self::client_err)?;
+
+        let result = BreakdownFeatureResponse {
+            session: SessionInfo {
+                id: response.session.id.to_string(),
+                feature_id: response.session.feature_id.to_string(),
+                goal: response.session.goal,
+                status: response.session.status.as_str().to_string(),
+            },
+            tasks: response
+                .tasks
+                .into_iter()
+                .map(|t| TaskInfo {
+                    id: t.id.to_string(),
+                    title: t.title,
+                    scope: t.scope,
+                    status: t.status.as_str().to_string(),
+                    agent_type: t.agent_type.as_str().to_string(),
+                })
+                .collect(),
+        };
+
+        let json = serde_json::to_string_pretty(&result)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(CallToolResult::success(vec![Content::text(json)]))
+    }
+
+    #[tool(
         description = "List all tasks in a session with their current status. Use this to monitor progress of parallel agent work. Returns array of tasks with: id, title, scope, status (pending/running/completed/failed), agent_type. Check status to know which tasks are done."
     )]
     async fn list_session_tasks(

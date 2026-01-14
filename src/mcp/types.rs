@@ -380,3 +380,49 @@ pub struct ProposedFeature {
     #[serde(default)]
     pub children: Vec<ProposedFeature>,
 }
+
+// ============================================================
+// Breakdown Feature (Session + Tasks in one call)
+// ============================================================
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct BreakdownFeatureRequest {
+    #[schemars(description = "The UUID of the feature to break down into tasks")]
+    pub feature_id: String,
+    #[schemars(
+        description = "The session goal - what will be accomplished when all tasks are complete"
+    )]
+    pub goal: String,
+    #[schemars(
+        description = "The tasks to create. Each task should be completable by one agent (1-3 story points)."
+    )]
+    pub tasks: Vec<TaskInputItem>,
+}
+
+/// A task to create as part of feature breakdown.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct TaskInputItem {
+    #[schemars(description = "Short title describing what this task accomplishes (2-5 words)")]
+    pub title: String,
+    #[schemars(
+        description = "Detailed scope of work - be specific about what to implement, test, or verify"
+    )]
+    pub scope: String,
+    #[schemars(
+        description = "Which agent type should handle this task: 'claude', 'gemini', or 'codex'. Defaults to 'claude'."
+    )]
+    #[serde(default = "default_claude")]
+    pub agent_type: String,
+}
+
+fn default_claude() -> String {
+    "claude".to_string()
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct BreakdownFeatureResponse {
+    /// The created session
+    pub session: SessionInfo,
+    /// The created tasks, ready for agent assignment
+    pub tasks: Vec<TaskInfo>,
+}
