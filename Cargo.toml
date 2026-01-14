@@ -1,13 +1,13 @@
 [package]
-name = "rocket-manifest"
+name = "manifest"
 version = "0.1.13"
 edition = "2021"
 description = "Living feature documentation server for AI-assisted development"
 license = "BUSL-1.1"
-repository = "https://github.com/rocket-tycoon/rocket-manifest"
+repository = "https://github.com/rocket-tycoon/manifest"
 
 [[bin]]
-name = "rmf"
+name = "mfst"
 path = "src/main.rs"
 
 [dependencies]

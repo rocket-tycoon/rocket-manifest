@@ -1,10 +1,10 @@
 use clap::{Parser, Subcommand};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use rocket_manifest::{api, db, mcp};
+use manifest::{api, db, mcp};
 
 #[derive(Parser)]
-#[command(name = "rmf")]
+#[command(name = "mfst")]
 #[command(version)]
 #[command(about = "Living feature documentation for AI-assisted development")]
 struct Cli {
@@ -14,7 +14,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Start the RocketManifest server
+    /// Start the Manifest server
     Serve {
         /// Port for HTTP API
         #[arg(short, long, default_value = "17010")]
@@ -39,8 +39,7 @@ enum Commands {
 /// Initialize tracing with output to stderr (for MCP mode) or stdout
 fn init_tracing(use_stderr: bool) {
     let filter = tracing_subscriber::EnvFilter::new(
-        std::env::var("RUST_LOG")
-            .unwrap_or_else(|_| "rocket_manifest=debug,tower_http=debug".into()),
+        std::env::var("RUST_LOG").unwrap_or_else(|_| "manifest=debug,tower_http=debug".into()),
     );
 
     if use_stderr {
@@ -72,9 +71,9 @@ async fn main() -> anyhow::Result<()> {
             daemon: _,
         }) => {
             // Allow env var override for container deployment
-            let bind_addr = std::env::var("ROCKET_MANIFEST_BIND_ADDR").unwrap_or(bind);
+            let bind_addr = std::env::var("MANIFEST_BIND_ADDR").unwrap_or(bind);
 
-            tracing::info!("Starting RocketManifest server on {}:{}", bind_addr, port);
+            tracing::info!("Starting Manifest server on {}:{}", bind_addr, port);
 
             let db = db::Database::open_default()?;
             db.migrate()?;
@@ -82,37 +81,33 @@ async fn main() -> anyhow::Result<()> {
             let app = api::create_router(db);
 
             let listener = tokio::net::TcpListener::bind(format!("{}:{}", bind_addr, port)).await?;
-            tracing::info!(
-                "RocketManifest server listening on http://{}:{}",
-                bind_addr,
-                port
-            );
+            tracing::info!("Manifest server listening on http://{}:{}", bind_addr, port);
 
             axum::serve(listener, app).await?;
         }
         Some(Commands::Mcp) => {
             // MCP server uses HTTP client to connect to the API
-            // No local database needed - configure via ROCKET_MANIFEST_URL env var
+            // No local database needed - configure via MANIFEST_URL env var
             mcp::run_stdio_server().await?;
         }
         Some(Commands::Status) => {
-            println!("Checking RocketManifest server status...");
+            println!("Checking Manifest server status...");
             // TODO: Check if server is running
         }
         Some(Commands::Stop) => {
-            println!("Stopping RocketManifest server...");
+            println!("Stopping Manifest server...");
             // TODO: Stop daemon
         }
         None => {
             // Default: start server
             let bind_addr =
-                std::env::var("ROCKET_MANIFEST_BIND_ADDR").unwrap_or_else(|_| "127.0.0.1".into());
-            let port: u16 = std::env::var("ROCKET_MANIFEST_PORT")
+                std::env::var("MANIFEST_BIND_ADDR").unwrap_or_else(|_| "127.0.0.1".into());
+            let port: u16 = std::env::var("MANIFEST_PORT")
                 .ok()
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(17010);
 
-            tracing::info!("Starting RocketManifest server on {}:{}", bind_addr, port);
+            tracing::info!("Starting Manifest server on {}:{}", bind_addr, port);
 
             let db = db::Database::open_default()?;
             db.migrate()?;
@@ -120,11 +115,7 @@ async fn main() -> anyhow::Result<()> {
             let app = api::create_router(db);
 
             let listener = tokio::net::TcpListener::bind(format!("{}:{}", bind_addr, port)).await?;
-            tracing::info!(
-                "RocketManifest server listening on http://{}:{}",
-                bind_addr,
-                port
-            );
+            tracing::info!("Manifest server listening on http://{}:{}", bind_addr, port);
 
             axum::serve(listener, app).await?;
         }

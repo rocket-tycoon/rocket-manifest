@@ -1,4 +1,4 @@
--- Initial schema for RocketManifest
+-- Initial schema for Manifest
 -- Creates all tables for feature documentation system
 
 CREATE TABLE projects (

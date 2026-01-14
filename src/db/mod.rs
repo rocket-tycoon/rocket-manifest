@@ -30,10 +30,10 @@ impl Database {
 
     pub fn open_default() -> Result<Self> {
         // Check for custom data directory from environment
-        let db_path = if let Ok(data_dir) = std::env::var("ROCKET_MANIFEST_DATA_DIR") {
+        let db_path = if let Ok(data_dir) = std::env::var("MANIFEST_DATA_DIR") {
             PathBuf::from(data_dir).join("manifest.db")
         } else {
-            let dirs = directories::ProjectDirs::from("", "", "rocket-manifest")
+            let dirs = directories::ProjectDirs::from("", "", "manifest")
                 .ok_or_else(|| anyhow::anyhow!("Could not determine data directory"))?;
             dirs.data_dir().join("manifest.db")
         };
