@@ -1,15 +1,15 @@
-# fly.toml - Fly.io configuration for RocketManifest
+# fly.toml - Fly.io configuration for Manifest
 # App name is overridden by --app flag or FLY_APP environment variable
 
-app = "rocket-manifest"
+app = "manifest"
 primary_region = "sjc"
 
 [build]
   dockerfile = "Dockerfile"
 
 [env]
-  RUST_LOG = "rocket_manifest=info,tower_http=info"
-  ROCKET_MANIFEST_DATA_DIR = "/data"
+  RUST_LOG = "manifest=info,tower_http=info"
+  MANIFEST_DATA_DIR = "/data"
 
 [http_service]
   internal_port = 17010
@@ -32,7 +32,7 @@ primary_region = "sjc"
   path = "/api/v1/health"
 
 [mounts]
-  source = "rmf_data"
+  source = "mfst_data"
   destination = "/data"
   initial_size = "1gb"
 

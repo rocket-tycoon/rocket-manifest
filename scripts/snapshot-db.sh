@@ -5,16 +5,16 @@
 #
 # Prerequisites:
 #   - flyctl installed and authenticated
-#   - Access to both rocket-manifest (prod) and rocket-manifest-staging apps
+#   - Access to both manifest (prod) and manifest-staging apps
 
 set -euo pipefail
 
-PROD_APP="rocket-manifest"
-STAGING_APP="rocket-manifest-staging"
+PROD_APP="manifest"
+STAGING_APP="manifest-staging"
 DB_PATH="/data/manifest.db"
 TEMP_FILE="/tmp/manifest-snapshot.db"
 
-echo "=== RocketManifest Database Snapshot ==="
+echo "=== Manifest Database Snapshot ==="
 echo "Source: $PROD_APP"
 echo "Target: $STAGING_APP"
 echo ""

@@ -34,8 +34,8 @@ jobs:
 
       - name: Create Snapshot
         run: |
-          PROD_APP="rocket-manifest"
-          STAGING_APP="rocket-manifest-staging"
+          PROD_APP="manifest"
+          STAGING_APP="manifest-staging"
           DB_PATH="/data/manifest.db"
           TEMP_FILE="/tmp/manifest-snapshot.db"
 

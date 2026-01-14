@@ -1,4 +1,4 @@
-# RocketManifest justfile
+# Manifest justfile
 # Run `just` to see available commands
 
 # Default: list available commands

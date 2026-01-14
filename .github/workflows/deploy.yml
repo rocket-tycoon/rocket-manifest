@@ -25,7 +25,7 @@ jobs:
       - name: Deploy to Staging
         run: |
           flyctl deploy \
-            --app rocket-manifest-staging \
+            --app manifest-staging \
             --config fly.toml \
             --remote-only
 
@@ -44,6 +44,6 @@ jobs:
       - name: Deploy to Production
         run: |
           flyctl deploy \
-            --app rocket-manifest \
+            --app manifest \
             --config fly.toml \
             --remote-only

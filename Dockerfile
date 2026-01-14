@@ -10,7 +10,7 @@ COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs && echo "" > src/lib.rs
 
 # Build dependencies only
-RUN cargo build --release && rm -rf src target/release/deps/rocket_manifest*
+RUN cargo build --release && rm -rf src target/release/deps/manifest*
 
 # Copy actual source
 COPY src ./src
@@ -29,20 +29,20 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
-RUN useradd -m -s /bin/bash rmf
+RUN useradd -m -s /bin/bash mfst
 
 # Create data directory
-RUN mkdir -p /data && chown rmf:rmf /data
+RUN mkdir -p /data && chown mfst:mfst /data
 
 # Copy binary from builder
-COPY --from=builder /app/target/release/rmf /usr/local/bin/rmf
+COPY --from=builder /app/target/release/mfst /usr/local/bin/mfst
 
 # Switch to non-root user
-USER rmf
+USER mfst
 
 # Set data directory and bind to all interfaces for container networking
-ENV ROCKET_MANIFEST_DATA_DIR=/data
-ENV ROCKET_MANIFEST_BIND_ADDR=0.0.0.0
+ENV MANIFEST_DATA_DIR=/data
+ENV MANIFEST_BIND_ADDR=0.0.0.0
 
 # Expose port
 EXPOSE 17010
@@ -52,5 +52,5 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:17010/api/v1/health || exit 1
 
 # Run the server
-ENTRYPOINT ["rmf"]
+ENTRYPOINT ["mfst"]
 CMD ["serve", "--port", "17010"]
