@@ -58,35 +58,59 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 echo "Updating Cargo.toml..."
 sed -i '' "s/^version = \".*\"/version = \"$VERSION\"/" "$PROJECT_ROOT/Cargo.toml"
 
-# Update plugin.json
-echo "Updating plugin.json..."
-PLUGIN_JSON="$PROJECT_ROOT/plugins/claude-code/.claude-plugin/plugin.json"
-sed -i '' "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" "$PLUGIN_JSON"
+# Update plugin.json in claude-plugins marketplace
+echo "Updating plugin.json in claude-plugins..."
+CLAUDE_PLUGINS_DIR="$(dirname "$PROJECT_ROOT")/claude-plugins"
+PLUGIN_JSON="$CLAUDE_PLUGINS_DIR/plugins/rocketmanifest/.claude-plugin/plugin.json"
+if [ -f "$PLUGIN_JSON" ]; then
+    sed -i '' "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" "$PLUGIN_JSON"
+else
+    echo "Warning: $PLUGIN_JSON not found, skipping plugin.json update"
+fi
 
-# Update rmf-wrapper.sh
-echo "Updating rmf-wrapper.sh..."
-WRAPPER_SH="$PROJECT_ROOT/plugins/claude-code/bin/rmf-wrapper.sh"
-sed -i '' "s/^VERSION=\".*\"/VERSION=\"$VERSION\"/" "$WRAPPER_SH"
+# Update rmf-wrapper.sh in claude-plugins marketplace
+echo "Updating rmf-wrapper.sh in claude-plugins..."
+CLAUDE_PLUGINS_DIR="$(dirname "$PROJECT_ROOT")/claude-plugins"
+WRAPPER_SH="$CLAUDE_PLUGINS_DIR/plugins/rocketmanifest/bin/rmf-wrapper.sh"
+if [ -f "$WRAPPER_SH" ]; then
+    sed -i '' "s/^VERSION=\".*\"/VERSION=\"$VERSION\"/" "$WRAPPER_SH"
+else
+    echo "Warning: $WRAPPER_SH not found, skipping wrapper update"
+fi
 
-# Verify changes
+# Verify changes in RocketManifest
 echo
-echo "Changes made:"
+echo "Changes in RocketManifest:"
 git diff --stat
 
-# Commit
+# Commit RocketManifest
 echo
-echo "Committing..."
-git add "$PROJECT_ROOT/Cargo.toml" "$PLUGIN_JSON" "$WRAPPER_SH"
+echo "Committing RocketManifest..."
+git add "$PROJECT_ROOT/Cargo.toml"
 git commit -m "Bump version to $VERSION"
 
 # Tag
 echo "Creating tag v$VERSION..."
 git tag "v$VERSION"
 
-# Push
-echo "Pushing to origin..."
+# Push RocketManifest
+echo "Pushing RocketManifest to origin..."
 git push origin main
 git push origin "v$VERSION"
+
+# Commit and push claude-plugins if files were updated
+if [ -d "$CLAUDE_PLUGINS_DIR/.git" ]; then
+    echo
+    echo "Committing claude-plugins..."
+    git -C "$CLAUDE_PLUGINS_DIR" add plugins/rocketmanifest/
+    if git -C "$CLAUDE_PLUGINS_DIR" diff --cached --quiet; then
+        echo "No changes to commit in claude-plugins"
+    else
+        git -C "$CLAUDE_PLUGINS_DIR" commit -m "Update rocketmanifest to $VERSION"
+        echo "Pushing claude-plugins to origin..."
+        git -C "$CLAUDE_PLUGINS_DIR" push origin main
+    fi
+fi
 
 echo
 echo "Release v$VERSION initiated!"
