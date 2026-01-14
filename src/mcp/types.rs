@@ -144,7 +144,16 @@ pub struct UpdateFeatureStateRequest {
     #[schemars(
         description = "The new state: 'proposed', 'specified', 'implemented', or 'deprecated'"
     )]
-    pub state: String,
+    #[serde(default)]
+    pub state: Option<String>,
+    #[schemars(description = "New title for the feature")]
+    #[serde(default)]
+    pub title: Option<String>,
+    #[schemars(
+        description = "New details for the feature. Use this to update the living documentation when implementation reveals new information."
+    )]
+    #[serde(default)]
+    pub details: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]

@@ -580,7 +580,7 @@ impl McpServer {
     }
 
     #[tool(
-        description = "Update a feature's state. Use this to transition features through their lifecycle: proposed → specified → implemented → deprecated. Typically called by orchestrators after completing work or during planning."
+        description = "Update a feature's state, title, or details. Use this to transition features through their lifecycle (proposed → specified → implemented → deprecated) or to update living documentation when implementation reveals new information. At least one field (state, title, or details) must be provided."
     )]
     async fn update_feature_state(
         &self,
@@ -589,15 +589,29 @@ impl McpServer {
         let req = params.0;
         let feature_id = Self::parse_uuid(&req.feature_id)?;
 
-        let new_state = FeatureState::from_str(&req.state).map_err(|_| {
-            McpError::invalid_params(
-                format!(
-                    "Invalid state '{}'. Must be: proposed, specified, implemented, or deprecated",
-                    req.state
-                ),
+        // Validate at least one field is provided
+        if req.state.is_none() && req.title.is_none() && req.details.is_none() {
+            return Err(McpError::invalid_params(
+                "At least one of state, title, or details must be provided",
                 None,
-            )
-        })?;
+            ));
+        }
+
+        // Parse state if provided
+        let new_state = req
+            .state
+            .map(|s| {
+                FeatureState::from_str(&s).map_err(|_| {
+                    McpError::invalid_params(
+                        format!(
+                            "Invalid state '{}'. Must be: proposed, specified, implemented, or deprecated",
+                            s
+                        ),
+                        None,
+                    )
+                })
+            })
+            .transpose()?;
 
         let feature = self
             .client
@@ -605,10 +619,10 @@ impl McpServer {
                 feature_id,
                 &UpdateFeatureInput {
                     parent_id: None,
-                    title: None,
-                    details: None,
+                    title: req.title,
+                    details: req.details,
                     desired_details: None,
-                    state: Some(new_state),
+                    state: new_state,
                     priority: None,
                 },
             )
