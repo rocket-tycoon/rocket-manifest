@@ -867,23 +867,17 @@ impl FeatureEditor {
                     .min_w(px(0.0))       // Override content-based minimum width
                     .h_full()
                     .overflow_hidden()
-                    .border_1()
-                    .border_color(Hsla { h: 0.0, s: 1.0, l: 0.5, a: 1.0 })  // Red debug border
                     // Inner scroll container: fills wrapper, scrolls content
                     .child(
                         div()
                             .id("tab-scroll-container")
-                            .size_full()
+                            .w_full()
+                            .h_full()
                             .overflow_x_scroll()
                             .track_scroll(&self.tab_bar_scroll_handle)
-                            // Tabs row: can be wider than container, will scroll
-                            .child(
-                                div()
-                                    .id("tabs-row")
-                                    .h_full()
-                                    .flex()
-                                    .flex_row()
-                                    .children(tab_data.into_iter().map(|(idx, _id, title, is_dirty, is_active)| {
+                            .flex()
+                            .flex_row()
+                            .children(tab_data.into_iter().map(|(idx, _id, title, is_dirty, is_active)| {
                         let bg_color = if is_active { colors::tab_active_bg() } else { colors::tab_inactive_bg() };
                         let text_color = if is_active { colors::text() } else { colors::text_muted() };
 
@@ -949,14 +943,13 @@ impl FeatureEditor {
                                         .child("×")
                                 )
                             })
-                                    }))  // closes tabs-row .children()
-                            )  // closes tabs-row div
+                            }))  // closes scroll-container .children()
                     )  // closes scroll-container div
             )  // closes wrapper div
-            // Spacer: fixed width to keep scroll area 100px from right edge
+            // Spacer: fixed width to keep scroll area 50px from right edge
             .child(
                 div()
-                    .w(px(100.0))
+                    .w(px(50.0))
                     .h_full()
             )
     }

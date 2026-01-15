@@ -430,31 +430,24 @@ impl Render for TerminalView {
                             .min_w(px(0.0))       // Override content-based minimum width
                             .h_full()
                             .overflow_hidden()
-                            .border_1()
-                            .border_color(Rgba { r: 1.0, g: 0.0, b: 0.0, a: 1.0 })
                             // Inner scroll container: fills wrapper, scrolls content
                             .child(
                                 div()
                                     .id("tab-scroll-container")
-                                    .size_full()
+                                    .w_full()
+                                    .h_full()
                                     .overflow_x_scroll()
                                     .track_scroll(&self.tab_bar_scroll_handle)
-                                    // Tabs row: can be wider than container, will scroll
-                                    .child(
-                                        div()
-                                            .id("tabs-row")
-                                            .h_full()
-                                            .flex()
-                                            .flex_row()
-                                            .children(tab_elements)
-                                    )
+                                    .flex()
+                                    .flex_row()
+                                    .children(tab_elements)
                             )
                     )
                     .child(add_button)
-                    // Spacer: fixed width for ~100px right margin (60px + ~40px add button)
+                    // Spacer: fixed width for ~50px right margin (10px + ~40px add button)
                     .child(
                         div()
-                            .w(px(60.0))
+                            .w(px(10.0))
                             .h_full()
                     )
             )
