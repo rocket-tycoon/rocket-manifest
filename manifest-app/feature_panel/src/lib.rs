@@ -464,11 +464,11 @@ impl Render for FeaturePanel {
                     )
             )
             .child(
-                // Content
+                // Content (scrollable)
                 div()
                     .id("feature-list")
                     .flex_1()
-                    .overflow_hidden()
+                    .overflow_y_scroll()
                     .child(match &self.load_state {
                         LoadState::Loading => {
                             div()
