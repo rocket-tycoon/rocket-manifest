@@ -2,8 +2,8 @@
 
 use gpui::{
     px, App, AsyncWindowContext, Context, Entity, EventEmitter, Focusable, FocusHandle,
-    InteractiveElement, IntoElement, KeyDownEvent, ParentElement, Render, SharedString,
-    StatefulInteractiveElement, Styled, WeakEntity, Window, div, prelude::*,
+    InteractiveElement, IntoElement, KeyDownEvent, ParentElement, Render, Rgba, ScrollHandle,
+    SharedString, StatefulInteractiveElement, Styled, WeakEntity, Window, div, prelude::*,
 };
 use terminal::{Event as TerminalEvent, Terminal, TerminalBuilder, mappings::colors::TerminalColors};
 
@@ -58,6 +58,8 @@ pub struct TerminalView {
     active_tab_idx: usize,
     next_tab_id: usize,
     focus_handle: FocusHandle,
+    /// Scroll handle for horizontal tab bar scrolling (like Zed).
+    tab_bar_scroll_handle: ScrollHandle,
 }
 
 impl TerminalView {
@@ -70,6 +72,7 @@ impl TerminalView {
             active_tab_idx: 0,
             next_tab_id: 0,
             focus_handle,
+            tab_bar_scroll_handle: ScrollHandle::new(),
         };
 
         // Create the first tab
@@ -86,6 +89,7 @@ impl TerminalView {
             active_tab_idx: 0,
             next_tab_id: 1,
             focus_handle,
+            tab_bar_scroll_handle: ScrollHandle::new(),
         };
 
         let tab = TerminalTab {
@@ -101,6 +105,7 @@ impl TerminalView {
     /// Add a new terminal tab and switch to it.
     fn add_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.create_tab_internal(window, cx);
+        self.tab_bar_scroll_handle.scroll_to_item(self.active_tab_idx);
         cx.notify();
     }
 
@@ -146,6 +151,7 @@ impl TerminalView {
     fn switch_tab(&mut self, idx: usize, cx: &mut Context<Self>) {
         if idx < self.tabs.len() && idx != self.active_tab_idx {
             self.active_tab_idx = idx;
+            self.tab_bar_scroll_handle.scroll_to_item(idx);
             cx.notify();
         }
     }
@@ -154,6 +160,7 @@ impl TerminalView {
     fn next_tab(&mut self, cx: &mut Context<Self>) {
         if self.tabs.len() > 1 {
             self.active_tab_idx = (self.active_tab_idx + 1) % self.tabs.len();
+            self.tab_bar_scroll_handle.scroll_to_item(self.active_tab_idx);
             cx.notify();
         }
     }
@@ -166,6 +173,7 @@ impl TerminalView {
             } else {
                 self.active_tab_idx - 1
             };
+            self.tab_bar_scroll_handle.scroll_to_item(self.active_tab_idx);
             cx.notify();
         }
     }
@@ -320,6 +328,7 @@ impl Render for TerminalView {
             let el = div()
                 .id(SharedString::from(format!("tab-{}", tab_id)))
                 .h_full()
+                .flex_shrink_0()  // Don't compress tabs - scroll instead
                 .px(px(12.0))
                 .flex()
                 .flex_row()
@@ -389,13 +398,6 @@ impl Render for TerminalView {
             }))
             .child("+");
 
-        // Spacer to fill remaining tab bar with bottom border
-        let tab_bar_spacer = div()
-            .flex_1()
-            .h_full()
-            .border_b_1()
-            .border_color(colors::border());
-
         // Render terminal content
         let terminal_content = self.render_terminal_content(window);
 
@@ -413,13 +415,48 @@ impl Render for TerminalView {
                     .id("tab-bar")
                     .h(px(32.0))
                     .w_full()
+                    .flex_shrink_0()
+                    .overflow_hidden()  // Constrain children to tab bar width
                     .flex()
                     .flex_row()
-                    .items_center()
                     .bg(colors::tab_bar_bg())
-                    .children(tab_elements)
+                    // Wrapper: flex item that takes remaining space (constrained by parent)
+                    .child(
+                        div()
+                            .id("tab-scroll-wrapper")
+                            .flex_1()
+                            .flex_shrink()
+                            .flex_basis(px(0.0))  // Start at 0, grow to fill - don't size from content
+                            .min_w(px(0.0))       // Override content-based minimum width
+                            .h_full()
+                            .overflow_hidden()
+                            .border_1()
+                            .border_color(Rgba { r: 1.0, g: 0.0, b: 0.0, a: 1.0 })
+                            // Inner scroll container: fills wrapper, scrolls content
+                            .child(
+                                div()
+                                    .id("tab-scroll-container")
+                                    .size_full()
+                                    .overflow_x_scroll()
+                                    .track_scroll(&self.tab_bar_scroll_handle)
+                                    // Tabs row: can be wider than container, will scroll
+                                    .child(
+                                        div()
+                                            .id("tabs-row")
+                                            .h_full()
+                                            .flex()
+                                            .flex_row()
+                                            .children(tab_elements)
+                                    )
+                            )
+                    )
                     .child(add_button)
-                    .child(tab_bar_spacer)
+                    // Spacer: fixed width for ~100px right margin (60px + ~40px add button)
+                    .child(
+                        div()
+                            .w(px(60.0))
+                            .h_full()
+                    )
             )
             // Terminal content area
             .child(
