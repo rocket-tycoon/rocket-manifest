@@ -13,4 +13,7 @@ path = "src/main.rs"
 gpui.workspace = true
 terminal.workspace = true
 terminal_view.workspace = true
+manifest_client.workspace = true
+feature_panel.workspace = true
 anyhow.workspace = true
+uuid.workspace = true
