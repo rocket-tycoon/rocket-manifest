@@ -218,7 +218,7 @@ impl TerminalElement {
         let run = TextRun {
             len: text.len(),
             font: Font {
-                family: "Monaco".into(),
+                family: "Bitstream Vera Sans Mono".into(),
                 features: Default::default(),
                 fallbacks: None,
                 weight: font_weight,
@@ -276,7 +276,7 @@ impl TerminalElement {
             let run = TextRun {
                 len: cursor_char.len(),
                 font: Font {
-                    family: "Monaco".into(),
+                    family: "Bitstream Vera Sans Mono".into(),
                     features: Default::default(),
                     fallbacks: None,
                     weight: FontWeight::NORMAL,
@@ -361,8 +361,30 @@ impl Element for TerminalElement {
 
         // Calculate dimensions based on font metrics
         let font_size = px(14.0);
-        let line_height = font_size * 1.3; // 1.3 line height for box-drawing
-        let cell_width = font_size * 0.6; // Approximate monospace width
+        let line_height = font_size * 1.2; // Standard line height for terminal rendering
+
+        // Measure actual cell width by shaping a reference character
+        let measure_run = TextRun {
+            len: 1,
+            font: Font {
+                family: "Bitstream Vera Sans Mono".into(),
+                features: Default::default(),
+                fallbacks: None,
+                weight: FontWeight::NORMAL,
+                style: FontStyle::Normal,
+            },
+            color: gpui::black(),
+            background_color: None,
+            underline: None,
+            strikethrough: None,
+        };
+        let measured = window.text_system().shape_line(
+            "M".into(),
+            font_size,
+            &[measure_run],
+            None,
+        );
+        let cell_width = measured.width;
 
         let dimensions = TerminalBounds::new(line_height, cell_width, bounds);
 
