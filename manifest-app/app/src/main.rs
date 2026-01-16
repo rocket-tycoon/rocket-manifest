@@ -13,11 +13,12 @@ use active_context::ActiveFeatureContext;
 use feature_editor::{Event as EditorEvent, FeatureEditor};
 use feature_panel::{Event as PanelEvent, FeaturePanel};
 use gpui::{
-    App, Application, Bounds, Context, CursorStyle, Entity, Focusable, KeyBinding, Menu, MenuItem,
-    MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, Render, Styled,
-    TitlebarOptions, Window, WindowBounds, WindowOptions, actions, div, point, prelude::*, px,
-    relative, size,
+    actions, div, point, prelude::*, px, relative, size, App, Application, Bounds, Context,
+    CursorStyle, Entity, Focusable, InteractiveElement, KeyBinding, Menu, MenuItem, MouseButton,
+    MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, PathPromptOptions, Render, Styled,
+    TitlebarOptions, Window, WindowBounds, WindowOptions,
 };
+use std::path::PathBuf;
 use manifest_core::db::Database;
 use parking_lot::Mutex;
 use terminal::mappings::colors::TerminalColors;
@@ -61,6 +62,21 @@ mod convert {
 
 actions!(app, [Quit, Open, OpenRecent, Save]);
 
+/// Load embedded IBM Plex Sans fonts into the text system.
+fn load_embedded_fonts(cx: &App) {
+    use std::borrow::Cow;
+
+    let fonts: Vec<Cow<'static, [u8]>> = vec![
+        Cow::Borrowed(include_bytes!("../fonts/IBMPlexSans-Regular.ttf")),
+        Cow::Borrowed(include_bytes!("../fonts/IBMPlexSans-Medium.ttf")),
+        Cow::Borrowed(include_bytes!("../fonts/IBMPlexSans-SemiBold.ttf")),
+    ];
+
+    if let Err(e) = cx.text_system().add_fonts(fonts) {
+        eprintln!("Failed to load embedded fonts: {}", e);
+    }
+}
+
 /// Pane colors (Pigs in Space theme).
 mod colors {
     use gpui::Hsla;
@@ -101,7 +117,7 @@ fn set_menus(cx: &mut App) {
         Menu {
             name: "File".into(),
             items: vec![
-                MenuItem::action("Open...", Open),
+                MenuItem::action("Open Working Directory...", Open),
                 MenuItem::action("Open Recent", OpenRecent),
                 MenuItem::separator(),
                 MenuItem::action("Save", Save),
@@ -115,6 +131,8 @@ struct ManifestApp {
     feature_panel: Entity<FeaturePanel>,
     feature_editor: Entity<FeatureEditor>,
     terminal_view: Entity<TerminalView>,
+    /// Current project directory path.
+    current_project_path: Option<PathBuf>,
     /// Flex values for editor/terminal split [editor_flex, terminal_flex].
     pane_flexes: Arc<Mutex<Vec<f32>>>,
     /// Whether the user is currently dragging the divider.
@@ -196,6 +214,7 @@ impl ManifestApp {
             feature_panel,
             feature_editor,
             terminal_view,
+            current_project_path: None,
             pane_flexes: Arc::new(Mutex::new(vec![1.0, 1.0])), // Equal split
             dragging_divider: Arc::new(Cell::new(false)),
             drag_start_y: Arc::new(Cell::new(0.0)),
@@ -251,16 +270,14 @@ impl ManifestApp {
         .detach();
     }
 
-    /// Fetch features directly from the database (blocking, runs on background thread).
-    fn fetch_features() -> Result<Vec<manifest_client::Feature>, String> {
+    /// Fetch features for a specific directory path (blocking, runs on background thread).
+    fn fetch_features_for_path(path: &str) -> Result<Vec<manifest_client::Feature>, String> {
         let db = Database::open_default().map_err(|e| format!("Failed to open database: {}", e))?;
         db.migrate()
             .map_err(|e| format!("Failed to migrate database: {}", e))?;
 
-        let project_path = "/Users/alastair/Documents/work/rocket-tycoon/RocketManifest";
-
         // Try to find project by directory
-        if let Ok(Some(project_with_dirs)) = db.get_project_by_directory(project_path) {
+        if let Ok(Some(project_with_dirs)) = db.get_project_by_directory(path) {
             eprintln!(
                 "Found project '{}' for directory",
                 project_with_dirs.project.name
@@ -280,6 +297,44 @@ impl ManifestApp {
                 }
                 Err(e) => {
                     eprintln!("Error fetching features: {}", e);
+                }
+            }
+        }
+
+        Err(format!("No project found for directory: {}", path))
+    }
+
+    /// Fetch features, trying CWD first then falling back to any project with features.
+    fn fetch_features() -> Result<Vec<manifest_client::Feature>, String> {
+        let db = Database::open_default().map_err(|e| format!("Failed to open database: {}", e))?;
+        db.migrate()
+            .map_err(|e| format!("Failed to migrate database: {}", e))?;
+
+        // Try current working directory first
+        if let Ok(cwd) = std::env::current_dir() {
+            if let Some(cwd_str) = cwd.to_str() {
+                if let Ok(Some(project_with_dirs)) = db.get_project_by_directory(cwd_str) {
+                    eprintln!(
+                        "Found project '{}' for current directory",
+                        project_with_dirs.project.name
+                    );
+                    match db.get_feature_tree(project_with_dirs.project.id) {
+                        Ok(features) => {
+                            eprintln!(
+                                "Loaded {} features from '{}'",
+                                features.len(),
+                                project_with_dirs.project.name
+                            );
+                            let converted: Vec<_> = features
+                                .into_iter()
+                                .map(convert::tree_node_to_feature)
+                                .collect();
+                            return Ok(converted);
+                        }
+                        Err(e) => {
+                            eprintln!("Error fetching features: {}", e);
+                        }
+                    }
                 }
             }
         }
@@ -311,6 +366,37 @@ impl ManifestApp {
         }
 
         Err("No projects with features found".into())
+    }
+
+    /// Open a project from a directory path and load its features.
+    fn open_project(&mut self, path: PathBuf, cx: &mut Context<Self>) {
+        let path_str = path.to_string_lossy().to_string();
+        self.current_project_path = Some(path.clone());
+
+        let feature_panel = self.feature_panel.clone();
+        let background_executor = cx.background_executor().clone();
+
+        cx.spawn(async move |_this, cx| {
+            let result = background_executor
+                .spawn(async move { Self::fetch_features_for_path(&path_str) })
+                .await;
+
+            match result {
+                Ok(features) => {
+                    eprintln!("Loaded {} features", features.len());
+                    cx.update_entity(&feature_panel, |panel, cx| {
+                        panel.set_features(features, cx);
+                    });
+                }
+                Err(e) => {
+                    eprintln!("Failed to load features: {}", e);
+                    cx.update_entity(&feature_panel, |panel, cx| {
+                        panel.set_error(e, cx);
+                    });
+                }
+            }
+        })
+        .detach();
     }
 
     /// Handle mouse down on divider.
@@ -468,17 +554,11 @@ impl Render for ManifestApp {
 
 fn main() {
     Application::new().run(|cx: &mut App| {
+        // Load embedded fonts first
+        load_embedded_fonts(cx);
+
         // Initialize global active feature context
         cx.set_global(ActiveFeatureContext::default());
-
-        // Register global actions
-        cx.on_action(|_: &Quit, cx| cx.quit());
-        cx.on_action(|_: &Open, _cx| {
-            eprintln!("Open action triggered");
-        });
-        cx.on_action(|_: &OpenRecent, _cx| {
-            eprintln!("Open Recent action triggered");
-        });
 
         // Set up application menus
         set_menus(cx);
@@ -511,10 +591,44 @@ fn main() {
             ..Default::default()
         };
 
-        cx.open_window(window_options, |window, cx| {
-            cx.new(|cx| ManifestApp::new(window, cx))
-        })
-        .ok();
+        let window_handle = cx
+            .open_window(window_options, |window, cx| {
+                cx.new(|cx| ManifestApp::new(window, cx))
+            })
+            .expect("Failed to open window");
+
+        // Register global actions (after window is created so we can reference it)
+        cx.on_action(|_: &Quit, cx| cx.quit());
+        cx.on_action(|_: &OpenRecent, _cx| {
+            eprintln!("Open Recent action triggered");
+        });
+
+        // Open action shows directory picker and loads project
+        let window_handle_for_open = window_handle.clone();
+        cx.on_action(move |_: &Open, cx| {
+            let options = PathPromptOptions {
+                files: false,
+                directories: true,
+                multiple: false,
+                prompt: Some("Open Manifest Project".into()),
+            };
+            let paths_receiver = cx.prompt_for_paths(options);
+            let window_handle = window_handle_for_open.clone();
+
+            cx.spawn(async move |cx| {
+                if let Ok(Ok(Some(paths))) = paths_receiver.await {
+                    if let Some(path) = paths.into_iter().next() {
+                        eprintln!("Opening project: {:?}", path);
+                        cx.update(|cx| {
+                            let _ = window_handle.update(cx, |app, _window, cx| {
+                                app.open_project(path, cx);
+                            });
+                        });
+                    }
+                }
+            })
+            .detach();
+        });
 
         cx.activate(true);
     });

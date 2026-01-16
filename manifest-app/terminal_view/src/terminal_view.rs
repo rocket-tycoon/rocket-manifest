@@ -324,6 +324,7 @@ impl TerminalView {
                     .flex()
                     .items_center()
                     .justify_center()
+                    .font_family("IBM Plex Sans")
                     .text_color(colors::text_muted())
                     .child("Starting terminal...")
                     .into_any_element()
@@ -336,6 +337,7 @@ impl TerminalView {
                 .flex()
                 .items_center()
                 .justify_center()
+                .font_family("IBM Plex Sans")
                 .text_color(colors::text_muted())
                 .child("No terminal")
                 .into_any_element()
@@ -399,15 +401,17 @@ impl Render for TerminalView {
                 .border_color(colors::border())
                 // Non-selected tabs have bottom border to separate from terminal
                 .when(!is_active, |el| el.border_b_1())
-                .hover(|s| s.bg(colors::hover_bg()))
+                // Only show hover state on non-selected tabs
+                .when(!is_active, |el| el.hover(|s| s.bg(colors::hover_bg())))
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.switch_tab(idx, cx);
                 }))
                 // Terminal icon
-                .child(div().text_size(px(12.0)).text_color(icon_color).child(">_"))
+                .child(div().font_family("IBM Plex Sans").text_size(px(12.0)).text_color(icon_color).child(">_"))
                 // Title
                 .child(
                     div()
+                        .font_family("IBM Plex Sans")
                         .text_size(px(13.0))
                         .text_color(text_color)
                         .child(title),
@@ -423,6 +427,7 @@ impl Render for TerminalView {
                             .flex()
                             .items_center()
                             .justify_center()
+                            .font_family("IBM Plex Sans")
                             .text_size(px(14.0))
                             .text_color(colors::text_muted())
                             .rounded(px(3.0))
@@ -445,6 +450,7 @@ impl Render for TerminalView {
             .items_center()
             .border_b_1()
             .border_color(colors::border())
+            .font_family("IBM Plex Sans")
             .text_size(px(16.0))
             .text_color(colors::text_muted())
             .hover(|s| s.text_color(colors::text()))

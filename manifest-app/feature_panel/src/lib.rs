@@ -566,9 +566,12 @@ impl FeaturePanel {
             .child(
                 div()
                     .pl(px(4.0))
+                    .font_family("IBM Plex Sans")
                     .text_color(colors::text_primary())
                     .text_size(px(13.0))
                     .overflow_hidden()
+                    .whitespace_nowrap()
+                    .text_ellipsis()
                     .child(title),
             )
     }
@@ -614,6 +617,7 @@ impl Render for FeaturePanel {
                     .border_color(rgba(0x2d333aff)) // border from pigs-in-space
                     .child(
                         div()
+                            .font_family("IBM Plex Sans")
                             .text_color(colors::text_primary())
                             .text_size(px(12.0))
                             .font_weight(gpui::FontWeight::BOLD)
@@ -640,12 +644,14 @@ impl Render for FeaturePanel {
                             .child(match &self.load_state {
                                 LoadState::Loading => div()
                                     .p(px(12.0))
+                                    .font_family("IBM Plex Sans")
                                     .text_color(colors::text_muted())
                                     .text_size(px(13.0))
                                     .child("Loading features...")
                                     .into_any_element(),
                                 LoadState::Error(err) => div()
                                     .p(px(12.0))
+                                    .font_family("IBM Plex Sans")
                                     .text_color(rgba(0xf14c4cff))
                                     .text_size(px(13.0))
                                     .child(format!("Error: {}", err))

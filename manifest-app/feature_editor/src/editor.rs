@@ -931,6 +931,7 @@ impl Render for FeatureEditor {
                             .justify_center()
                             .child(
                                 div()
+                                    .font_family("IBM Plex Sans")
                                     .text_color(colors::text_muted())
                                     .child("No features open"),
                             )
@@ -948,6 +949,8 @@ impl FeatureEditor {
         let can_close = self.tabs.len() > 0;
 
         // Tab bar container - fixed height, full width
+        // Note: No border_b here - each tab/spacer manages its own bottom border
+        // so active tabs can "break" the border line
         div()
             .id("tab-bar")
             .h(px(32.0))
@@ -957,8 +960,6 @@ impl FeatureEditor {
             .flex()
             .flex_row()
             .bg(colors::tab_bar_bg())
-            .border_b_1()
-            .border_color(colors::border())
             // Wrapper: flex item that takes remaining space (constrained by parent)
             .child(
                 div()
@@ -1005,7 +1006,8 @@ impl FeatureEditor {
                                         .border_r_1()
                                         .border_color(colors::border())
                                         .when(!is_active, |el| el.border_b_1())
-                                        .hover(|s| s.bg(colors::hover()))
+                                        // Only show hover state on non-selected tabs
+                                        .when(!is_active, |el| el.hover(|s| s.bg(colors::hover())))
                                         .cursor(CursorStyle::PointingHand)
                                         .on_click(cx.listener(move |this, _, _, cx| {
                                             this.switch_tab(idx, cx);
@@ -1023,6 +1025,7 @@ impl FeatureEditor {
                                         // Tab title
                                         .child(
                                             div()
+                                                .font_family("IBM Plex Sans")
                                                 .text_color(text_color)
                                                 .text_sm()
                                                 .text_ellipsis()
@@ -1041,6 +1044,7 @@ impl FeatureEditor {
                                                     .items_center()
                                                     .justify_center()
                                                     .rounded(px(3.0))
+                                                    .font_family("IBM Plex Sans")
                                                     .text_color(colors::text_muted())
                                                     .hover(|s| {
                                                         s.bg(colors::hover())
@@ -1062,7 +1066,15 @@ impl FeatureEditor {
                                             )
                                         })
                                 },
-                            )), // closes scroll-container .children()
+                            ))
+                            // Spacer fills remaining space with bottom border
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .h_full()
+                                    .border_b_1()
+                                    .border_color(colors::border()),
+                            ), // closes scroll-container .children() and spacer
                     ), // closes scroll-container div
             ) // closes wrapper div
             // Right toolbar area (50px) - will contain buttons in future
@@ -1071,6 +1083,7 @@ impl FeatureEditor {
                     .w(px(50.0))
                     .h_full()
                     .border_l_1()
+                    .border_b_1()
                     .border_color(colors::border()),
             )
     }
