@@ -93,7 +93,7 @@ speculate! {
             it "deletes the project and cascades to features" {
                 let project = create_test_project(&db);
 
-                db.create_feature(project.id, CreateFeatureInput {
+                db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Feature".to_string(),
 
@@ -159,7 +159,7 @@ speculate! {
         describe "create_feature" {
             it "creates a feature with required fields" {
                 let project = create_test_project(&db);
-                let input = CreateFeatureInput {
+                let input = CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "User Login".to_string(),
 
@@ -177,7 +177,7 @@ speculate! {
 
             it "creates a feature with all fields" {
                 let project = create_test_project(&db);
-                let input = CreateFeatureInput {
+                let input = CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "OAuth Integration".to_string(),
                     details: Some("As a user, I want to log in with OAuth.\n\n## Technical Notes\n\nUse PKCE flow".to_string()),
@@ -202,7 +202,7 @@ speculate! {
 
             it "returns the feature by id" {
                 let project = create_test_project(&db);
-                let input = CreateFeatureInput {
+                let input = CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Rate Limiting".to_string(),
 
@@ -228,7 +228,7 @@ speculate! {
             it "returns all features ordered by title" {
                 let project = create_test_project(&db);
 
-                db.create_feature(project.id, CreateFeatureInput {
+                db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Zebra Feature".to_string(),
 
@@ -237,7 +237,7 @@ speculate! {
                     state: None,
                 }).expect("Failed to create");
 
-                db.create_feature(project.id, CreateFeatureInput {
+                db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Alpha Feature".to_string(),
 
@@ -271,7 +271,7 @@ speculate! {
 
             it "updates only provided fields" {
                 let project = create_test_project(&db);
-                let created = db.create_feature(project.id, CreateFeatureInput {
+                let created = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Original Title".to_string(),
 
@@ -295,7 +295,7 @@ speculate! {
 
             it "transitions feature state" {
                 let project = create_test_project(&db);
-                let created = db.create_feature(project.id, CreateFeatureInput {
+                let created = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Feature".to_string(),
 
@@ -325,7 +325,7 @@ speculate! {
 
             it "deletes the feature and returns true" {
                 let project = create_test_project(&db);
-                let created = db.create_feature(project.id, CreateFeatureInput {
+                let created = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "To Delete".to_string(),
 
@@ -345,7 +345,7 @@ speculate! {
         describe "get_feature_diff" {
             it "returns has_changes false when no desired_details" {
                 let project = create_test_project(&db);
-                let feature = db.create_feature(project.id, CreateFeatureInput {
+                let feature = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Feature".to_string(),
                     details: Some("Current details".to_string()),
@@ -361,7 +361,7 @@ speculate! {
 
             it "returns has_changes true when desired_details differs" {
                 let project = create_test_project(&db);
-                let feature = db.create_feature(project.id, CreateFeatureInput {
+                let feature = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Feature".to_string(),
                     details: Some("Current".to_string()),
@@ -393,7 +393,7 @@ speculate! {
         describe "desired_details" {
             it "stores and retrieves desired_details" {
                 let project = create_test_project(&db);
-                let feature = db.create_feature(project.id, CreateFeatureInput {
+                let feature = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Feature".to_string(),
                     details: Some("Current".to_string()),
@@ -419,7 +419,7 @@ speculate! {
         describe "search_features" {
             it "returns empty list when no matches" {
                 let project = create_test_project(&db);
-                db.create_feature(project.id, CreateFeatureInput {
+                db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "User Login".to_string(),
                     details: None,
@@ -433,7 +433,7 @@ speculate! {
 
             it "matches title case-insensitively" {
                 let project = create_test_project(&db);
-                db.create_feature(project.id, CreateFeatureInput {
+                db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "User Authentication".to_string(),
                     details: None,
@@ -451,7 +451,7 @@ speculate! {
 
             it "matches details content" {
                 let project = create_test_project(&db);
-                db.create_feature(project.id, CreateFeatureInput {
+                db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "OAuth Integration".to_string(),
                     details: Some("Implement Google OAuth using PKCE flow".to_string()),
@@ -466,7 +466,7 @@ speculate! {
 
             it "ranks title matches before details matches" {
                 let project = create_test_project(&db);
-                db.create_feature(project.id, CreateFeatureInput {
+                db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "User Login".to_string(),
                     details: Some("Some login details".to_string()),
@@ -474,7 +474,7 @@ speculate! {
                     state: None,
                 }).expect("Failed to create");
 
-                db.create_feature(project.id, CreateFeatureInput {
+                db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "OAuth Flow".to_string(),
                     details: Some("User must click login button".to_string()),
@@ -503,7 +503,7 @@ speculate! {
                     instructions: None,
                 }).expect("Failed to create project");
 
-                db.create_feature(project1.id, CreateFeatureInput {
+                db.create_feature(project1.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Auth Feature".to_string(),
                     details: None,
@@ -511,7 +511,7 @@ speculate! {
                     state: None,
                 }).expect("Failed to create");
 
-                db.create_feature(project2.id, CreateFeatureInput {
+                db.create_feature(project2.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Auth in Project 2".to_string(),
                     details: None,
@@ -527,7 +527,7 @@ speculate! {
             it "respects limit parameter" {
                 let project = create_test_project(&db);
                 for i in 1..=5 {
-                    db.create_feature(project.id, CreateFeatureInput {
+                    db.create_feature(project.id, CreateFeatureInput { id: None,
                         parent_id: None,
                         title: format!("Feature {}", i),
                         details: None,
@@ -543,7 +543,7 @@ speculate! {
             it "defaults limit to 10" {
                 let project = create_test_project(&db);
                 for i in 1..=15 {
-                    db.create_feature(project.id, CreateFeatureInput {
+                    db.create_feature(project.id, CreateFeatureInput { id: None,
                         parent_id: None,
                         title: format!("Feature {}", i),
                         details: None,
@@ -558,7 +558,7 @@ speculate! {
 
             it "returns FeatureSummary not full Feature" {
                 let project = create_test_project(&db);
-                let feature = db.create_feature(project.id, CreateFeatureInput {
+                let feature = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Test Feature".to_string(),
                     details: Some("Detailed description".to_string()),
@@ -583,7 +583,7 @@ speculate! {
         describe "nested features" {
             it "creates a child feature under a parent" {
                 let project = create_test_project(&db);
-                let parent = db.create_feature(project.id, CreateFeatureInput {
+                let parent = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Authentication".to_string(),
 
@@ -592,7 +592,7 @@ speculate! {
                     state: None,
                 }).expect("Failed to create parent");
 
-                let child = db.create_feature(project.id, CreateFeatureInput {
+                let child = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: Some(parent.id),
                     title: "Login".to_string(),
 
@@ -606,7 +606,7 @@ speculate! {
 
             it "creates deeply nested features" {
                 let project = create_test_project(&db);
-                let root = db.create_feature(project.id, CreateFeatureInput {
+                let root = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Authentication".to_string(),
 
@@ -615,7 +615,7 @@ speculate! {
                     state: None,
                 }).expect("Failed to create");
 
-                let level1 = db.create_feature(project.id, CreateFeatureInput {
+                let level1 = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: Some(root.id),
                     title: "OAuth".to_string(),
 
@@ -624,7 +624,7 @@ speculate! {
                     state: None,
                 }).expect("Failed to create");
 
-                let level2 = db.create_feature(project.id, CreateFeatureInput {
+                let level2 = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: Some(level1.id),
                     title: "Google".to_string(),
 
@@ -643,7 +643,7 @@ speculate! {
         describe "get_root_features" {
             it "returns only features without parents" {
                 let project = create_test_project(&db);
-                let root1 = db.create_feature(project.id, CreateFeatureInput {
+                let root1 = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Root 1".to_string(),
 
@@ -652,7 +652,7 @@ speculate! {
                     state: None,
                 }).expect("Failed to create");
 
-                let _root2 = db.create_feature(project.id, CreateFeatureInput {
+                let _root2 = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Root 2".to_string(),
 
@@ -661,7 +661,7 @@ speculate! {
                     state: None,
                 }).expect("Failed to create");
 
-                db.create_feature(project.id, CreateFeatureInput {
+                db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: Some(root1.id),
                     title: "Child".to_string(),
 
@@ -680,7 +680,7 @@ speculate! {
         describe "get_children" {
             it "returns empty list when feature has no children" {
                 let project = create_test_project(&db);
-                let leaf = db.create_feature(project.id, CreateFeatureInput {
+                let leaf = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Leaf".to_string(),
 
@@ -695,7 +695,7 @@ speculate! {
 
             it "returns direct children ordered by title" {
                 let project = create_test_project(&db);
-                let parent = db.create_feature(project.id, CreateFeatureInput {
+                let parent = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Parent".to_string(),
 
@@ -704,7 +704,7 @@ speculate! {
                     state: None,
                 }).expect("Failed to create");
 
-                db.create_feature(project.id, CreateFeatureInput {
+                db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: Some(parent.id),
                     title: "Zebra Child".to_string(),
 
@@ -713,7 +713,7 @@ speculate! {
                     state: None,
                 }).expect("Failed to create");
 
-                db.create_feature(project.id, CreateFeatureInput {
+                db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: Some(parent.id),
                     title: "Alpha Child".to_string(),
 
@@ -731,7 +731,7 @@ speculate! {
 
             it "does not return grandchildren" {
                 let project = create_test_project(&db);
-                let parent = db.create_feature(project.id, CreateFeatureInput {
+                let parent = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Parent".to_string(),
 
@@ -740,7 +740,7 @@ speculate! {
                     state: None,
                 }).expect("Failed to create");
 
-                let child = db.create_feature(project.id, CreateFeatureInput {
+                let child = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: Some(parent.id),
                     title: "Child".to_string(),
 
@@ -749,7 +749,7 @@ speculate! {
                     state: None,
                 }).expect("Failed to create");
 
-                db.create_feature(project.id, CreateFeatureInput {
+                db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: Some(child.id),
                     title: "Grandchild".to_string(),
 
@@ -767,7 +767,7 @@ speculate! {
         describe "is_leaf" {
             it "returns true for feature with no children" {
                 let project = create_test_project(&db);
-                let leaf = db.create_feature(project.id, CreateFeatureInput {
+                let leaf = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Leaf".to_string(),
 
@@ -781,7 +781,7 @@ speculate! {
 
             it "returns false for feature with children" {
                 let project = create_test_project(&db);
-                let parent = db.create_feature(project.id, CreateFeatureInput {
+                let parent = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Parent".to_string(),
 
@@ -790,7 +790,7 @@ speculate! {
                     state: None,
                 }).expect("Failed to create");
 
-                db.create_feature(project.id, CreateFeatureInput {
+                db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: Some(parent.id),
                     title: "Child".to_string(),
 
@@ -806,7 +806,7 @@ speculate! {
         describe "cascade delete" {
             it "deletes children when parent is deleted" {
                 let project = create_test_project(&db);
-                let parent = db.create_feature(project.id, CreateFeatureInput {
+                let parent = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Parent".to_string(),
 
@@ -815,7 +815,7 @@ speculate! {
                     state: None,
                 }).expect("Failed to create");
 
-                let child = db.create_feature(project.id, CreateFeatureInput {
+                let child = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: Some(parent.id),
                     title: "Child".to_string(),
 
@@ -836,7 +836,7 @@ speculate! {
         describe "leaf validation" {
             it "allows session on leaf feature" {
                 let project = create_test_project(&db);
-                let leaf = db.create_feature(project.id, CreateFeatureInput {
+                let leaf = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Leaf Feature".to_string(),
 
@@ -856,7 +856,7 @@ speculate! {
 
             it "rejects session on non-leaf feature" {
                 let project = create_test_project(&db);
-                let parent = db.create_feature(project.id, CreateFeatureInput {
+                let parent = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Parent".to_string(),
 
@@ -865,7 +865,7 @@ speculate! {
                     state: None,
                 }).expect("Failed to create");
 
-                db.create_feature(project.id, CreateFeatureInput {
+                db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: Some(parent.id),
                     title: "Child".to_string(),
 
@@ -898,7 +898,7 @@ speculate! {
 
             it "completes session and creates history entry" {
                 let project = create_test_project(&db);
-                let feature = db.create_feature(project.id, CreateFeatureInput {
+                let feature = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Feature".to_string(),
 
@@ -932,7 +932,7 @@ speculate! {
 
             it "deletes tasks on completion" {
                 let project = create_test_project(&db);
-                let feature = db.create_feature(project.id, CreateFeatureInput {
+                let feature = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Feature".to_string(),
 
@@ -967,7 +967,7 @@ speculate! {
 
             it "rejects completing already completed session" {
                 let project = create_test_project(&db);
-                let feature = db.create_feature(project.id, CreateFeatureInput {
+                let feature = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Feature".to_string(),
 
@@ -1001,7 +1001,7 @@ speculate! {
 
             it "promotes desired_details to details when marking implemented" {
                 let project = create_test_project(&db);
-                let feature = db.create_feature(project.id, CreateFeatureInput {
+                let feature = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Feature".to_string(),
                     details: Some("Original details".to_string()),
@@ -1045,7 +1045,7 @@ speculate! {
         describe "create_history_entry" {
             it "creates a history entry with all fields" {
                 let project = create_test_project(&db);
-                let feature = db.create_feature(project.id, CreateFeatureInput {
+                let feature = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Test Feature".to_string(),
 
@@ -1071,7 +1071,7 @@ speculate! {
 
             it "creates entry without session_id" {
                 let project = create_test_project(&db);
-                let feature = db.create_feature(project.id, CreateFeatureInput {
+                let feature = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Manual Feature".to_string(),
 
@@ -1096,7 +1096,7 @@ speculate! {
         describe "get_feature_history" {
             it "returns empty list when no history exists" {
                 let project = create_test_project(&db);
-                let feature = db.create_feature(project.id, CreateFeatureInput {
+                let feature = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "New Feature".to_string(),
 
@@ -1111,7 +1111,7 @@ speculate! {
 
             it "returns history entries in reverse chronological order" {
                 let project = create_test_project(&db);
-                let feature = db.create_feature(project.id, CreateFeatureInput {
+                let feature = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Feature".to_string(),
 
@@ -1147,7 +1147,7 @@ speculate! {
 
             it "only returns history for specified feature" {
                 let project = create_test_project(&db);
-                let feature1 = db.create_feature(project.id, CreateFeatureInput {
+                let feature1 = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Feature 1".to_string(),
 
@@ -1156,7 +1156,7 @@ speculate! {
                     state: None,
                 }).expect("Failed to create");
 
-                let feature2 = db.create_feature(project.id, CreateFeatureInput {
+                let feature2 = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Feature 2".to_string(),
 
@@ -1193,7 +1193,7 @@ speculate! {
         describe "cascade delete" {
             it "deletes history when feature is deleted" {
                 let project = create_test_project(&db);
-                let feature = db.create_feature(project.id, CreateFeatureInput {
+                let feature = db.create_feature(project.id, CreateFeatureInput { id: None,
                     parent_id: None,
                     title: "Feature".to_string(),
 

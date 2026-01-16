@@ -5,6 +5,8 @@
 //! - `MANIFEST_URL` - Base URL (default: `http://localhost:17010/api/v1`)
 //! - `MANIFEST_API_KEY` - API key for authentication (optional for local)
 
+use std::time::Duration;
+
 use reqwest::{Client, StatusCode};
 use serde::de::DeserializeOwned;
 use thiserror::Error;
@@ -56,10 +58,16 @@ impl ManifestClient {
 
     /// Create with explicit configuration.
     pub fn new(base_url: impl Into<String>, api_key: Option<String>) -> Self {
+        let client = Client::builder()
+            .connect_timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(30))
+            .build()
+            .expect("Failed to build HTTP client");
+
         Self {
             base_url: base_url.into(),
             api_key,
-            client: Client::new(),
+            client,
         }
     }
 

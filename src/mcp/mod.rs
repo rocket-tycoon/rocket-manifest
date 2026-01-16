@@ -775,6 +775,7 @@ impl McpServer {
             .create_feature(
                 project_id,
                 &CreateFeatureInput {
+                    id: None,
                     parent_id,
                     title: req.title,
                     details: req.details,

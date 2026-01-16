@@ -78,6 +78,10 @@ impl FromStr for FeatureState {
 /// Input for creating a new feature.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateFeatureInput {
+    /// Pre-generated feature ID. If not provided, a new UUID will be generated.
+    /// Use this for bulk creation where parent-child relationships need known IDs.
+    #[serde(default)]
+    pub id: Option<Uuid>,
     /// Parent feature ID for nesting. `None` creates a root feature.
     pub parent_id: Option<Uuid>,
     pub title: String,

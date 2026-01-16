@@ -49,6 +49,7 @@ mod feature_roots {
         let root = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Root".to_string(),
                 state: None,
@@ -63,6 +64,7 @@ mod feature_roots {
         server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: Some(root.id),
                 title: "Child".to_string(),
                 state: None,
@@ -95,6 +97,7 @@ mod feature_children {
         let feature = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Leaf".to_string(),
                 state: None,
@@ -122,6 +125,7 @@ mod feature_children {
         let parent = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Parent".to_string(),
                 state: None,
@@ -135,6 +139,7 @@ mod feature_children {
         server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: Some(parent.id),
                 title: "Zebra".to_string(),
                 state: None,
@@ -147,6 +152,7 @@ mod feature_children {
         server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: Some(parent.id),
                 title: "Alpha".to_string(),
                 state: None,
@@ -175,6 +181,7 @@ mod feature_children {
         let root = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Root".to_string(),
                 state: None,
@@ -188,6 +195,7 @@ mod feature_children {
         let child = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: Some(root.id),
                 title: "Child".to_string(),
                 state: None,
@@ -201,6 +209,7 @@ mod feature_children {
         server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: Some(child.id),
                 title: "Grandchild".to_string(),
                 state: None,
@@ -232,6 +241,7 @@ mod feature_hierarchy_create {
         let parent = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Authentication".to_string(),
                 state: None,
@@ -245,6 +255,7 @@ mod feature_hierarchy_create {
         let response = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: Some(parent.id),
                 title: "Login".to_string(),
                 state: None,
@@ -268,6 +279,7 @@ mod feature_hierarchy_create {
         let level0 = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Authentication".to_string(),
                 state: None,
@@ -281,6 +293,7 @@ mod feature_hierarchy_create {
         let level1 = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: Some(level0.id),
                 title: "OAuth".to_string(),
                 state: None,
@@ -294,6 +307,7 @@ mod feature_hierarchy_create {
         let level2 = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: Some(level1.id),
                 title: "Google".to_string(),
                 state: None,
@@ -324,6 +338,7 @@ mod feature_cascade_delete {
         let parent = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Parent".to_string(),
                 state: None,
@@ -337,6 +352,7 @@ mod feature_cascade_delete {
         let child = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: Some(parent.id),
                 title: "Child".to_string(),
                 state: None,
@@ -372,6 +388,7 @@ mod feature_history {
         let feature = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "New Feature".to_string(),
 
@@ -403,6 +420,7 @@ mod session_leaf_validation {
         let leaf = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Leaf Feature".to_string(),
                 state: None,
@@ -433,6 +451,7 @@ mod session_leaf_validation {
         let parent = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Parent".to_string(),
                 state: None,
@@ -446,6 +465,7 @@ mod session_leaf_validation {
         server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: Some(parent.id),
                 title: "Child".to_string(),
                 state: None,
@@ -481,6 +501,7 @@ mod session_completion {
         let feature = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Feature".to_string(),
                 state: None,
@@ -530,6 +551,7 @@ mod session_completion {
         let feature = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Feature".to_string(),
                 state: None,
@@ -853,6 +875,7 @@ mod features {
         server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Feature 1".to_string(),
 
@@ -865,6 +888,7 @@ mod features {
         server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Feature 2".to_string(),
 
@@ -890,6 +914,7 @@ mod features {
         let feature = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Test Feature".to_string(),
                 details: Some("As a user... Implementation details".to_string()),
@@ -928,6 +953,7 @@ mod features {
         let feature = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Original Title".to_string(),
 
@@ -993,6 +1019,7 @@ mod feature_search {
         server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "User Login".to_string(),
                 details: None,
@@ -1016,6 +1043,7 @@ mod feature_search {
         server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "User Authentication".to_string(),
                 details: None,
@@ -1027,6 +1055,7 @@ mod feature_search {
         server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Payment Processing".to_string(),
                 details: None,
@@ -1051,6 +1080,7 @@ mod feature_search {
         server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "OAuth Integration".to_string(),
                 details: Some("Implement Google OAuth using PKCE flow".to_string()),
@@ -1076,6 +1106,7 @@ mod feature_search {
             server
                 .post(&format!("/api/v1/projects/{}/features", project.id))
                 .json(&CreateFeatureInput {
+                    id: None,
                     parent_id: None,
                     title: format!("Feature {}", i),
                     details: None,
@@ -1121,6 +1152,7 @@ mod feature_search {
         server
             .post(&format!("/api/v1/projects/{}/features", project1.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Auth in Project 1".to_string(),
                 details: None,
@@ -1132,6 +1164,7 @@ mod feature_search {
         server
             .post(&format!("/api/v1/projects/{}/features", project2.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Auth in Project 2".to_string(),
                 details: None,
@@ -1169,6 +1202,7 @@ mod feature_diff {
         let feature = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Feature".to_string(),
                 details: Some("Current details".to_string()),
@@ -1197,6 +1231,7 @@ mod feature_diff {
         let feature = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Feature".to_string(),
                 details: Some("Current".to_string()),
@@ -1258,6 +1293,7 @@ mod feature_tree {
         let root = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Authentication".to_string(),
 
@@ -1271,6 +1307,7 @@ mod feature_tree {
         server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: Some(root.id),
                 title: "Login".to_string(),
 
@@ -1283,6 +1320,7 @@ mod feature_tree {
         server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: Some(root.id),
                 title: "Logout".to_string(),
 
@@ -1319,6 +1357,7 @@ mod sessions {
         let feature = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Feature".to_string(),
 
@@ -1368,6 +1407,7 @@ mod sessions {
         let feature = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Feature Title".to_string(),
 
@@ -1424,6 +1464,7 @@ mod tasks {
         let feature = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Feature".to_string(),
 
@@ -1479,6 +1520,7 @@ mod tasks {
         let feature = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Feature".to_string(),
 
@@ -1560,6 +1602,7 @@ mod session_tasks {
         let feature = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Feature".to_string(),
                 details: None,
@@ -1626,6 +1669,7 @@ mod session_tasks {
         let feature = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Feature".to_string(),
                 details: None,
@@ -1698,6 +1742,7 @@ mod feature_sessions {
         let feature = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Feature".to_string(),
                 details: None,
@@ -1724,6 +1769,7 @@ mod feature_sessions {
         let feature = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Feature".to_string(),
                 details: None,
@@ -1775,6 +1821,7 @@ mod feature_sessions {
         let feature = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Feature".to_string(),
                 details: None,
@@ -1807,6 +1854,7 @@ mod feature_sessions {
         let feature = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Feature".to_string(),
                 details: None,
@@ -1859,6 +1907,7 @@ mod feature_sessions {
         let parent = server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: None,
                 title: "Parent".to_string(),
                 details: None,
@@ -1872,6 +1921,7 @@ mod feature_sessions {
         server
             .post(&format!("/api/v1/projects/{}/features", project.id))
             .json(&CreateFeatureInput {
+                id: None,
                 parent_id: Some(parent.id),
                 title: "Child".to_string(),
                 details: None,
