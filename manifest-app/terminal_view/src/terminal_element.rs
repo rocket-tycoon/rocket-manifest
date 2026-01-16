@@ -9,7 +9,7 @@ use gpui::{
 use itertools::Itertools;
 use std::panic::Location;
 use terminal::{
-    Terminal, TerminalBounds, TerminalContent,
+    Mode, Terminal, TerminalBounds, TerminalContent,
     mappings::colors::{TerminalColors, convert_color},
 };
 
@@ -91,9 +91,13 @@ impl TerminalElement {
                 let col = cell.point.column.0 as i32;
                 let x = origin.x + (col as f32) * cell_width;
 
-                // Get cell colors
-                let fg_color = convert_color(&cell.fg);
-                let bg_color = convert_color(&cell.bg);
+                // Get cell colors, respecting INVERSE flag for reverse video
+                // TUI apps like Claude Code use reverse video to render their cursors
+                let (fg_color, bg_color) = if cell.flags.contains(Flags::INVERSE) {
+                    (convert_color(&cell.bg), convert_color(&cell.fg))
+                } else {
+                    (convert_color(&cell.fg), convert_color(&cell.bg))
+                };
 
                 // Draw background if not default
                 let bg_rgba: gpui::Rgba = bg_color.into();
@@ -257,8 +261,23 @@ impl TerminalElement {
         _cx: &mut App,
     ) -> Option<CursorLayout> {
         let cursor = &content.cursor;
+
+        // Respect cursor visibility from terminal mode (DECTCEM: ESC[?25h/l)
+        // TUI apps like Claude Code send ESC[?25l to hide the terminal cursor
+        // and render their own cursor as styled characters in the grid
+        if !content.mode.contains(Mode::SHOW_CURSOR) {
+            return None;
+        }
+
+        // Also respect Hidden cursor shape
+        if cursor.shape == CursorShape::Hidden {
+            return None;
+        }
+
+        // Convert from buffer coordinates to display coordinates by adding display_offset
+        // (same as Zed's DisplayCursor::from pattern)
         let col = cursor.point.column.0 as f32;
-        let line = cursor.point.line.0 as f32;
+        let line = (cursor.point.line.0 + content.display_offset as i32) as f32;
 
         let x = origin.x + col * dimensions.cell_width();
         let y = origin.y + line * dimensions.line_height();
@@ -384,7 +403,18 @@ impl Element for TerminalElement {
             .shape_line("M".into(), font_size, &[measure_run], None);
         let cell_width = measured.width;
 
-        let dimensions = TerminalBounds::new(line_height, cell_width, bounds);
+        // Interior padding
+        let padding = px(5.0);
+        let padding_left = px(10.0);
+        let content_bounds = Bounds {
+            origin: point(bounds.origin.x + padding_left, bounds.origin.y + padding),
+            size: size(
+                bounds.size.width - padding_left - padding,
+                bounds.size.height - padding * 2.0,
+            ),
+        };
+
+        let dimensions = TerminalBounds::new(line_height, cell_width, content_bounds);
 
         // Update terminal size
         self.terminal.update(cx, |terminal, _cx| {
@@ -394,7 +424,7 @@ impl Element for TerminalElement {
         // Get terminal content
         let content = self.terminal.read(cx).last_content().clone();
 
-        let origin = bounds.origin;
+        let origin = content_bounds.origin;
 
         // Layout grid
         let (background_rects, text_runs) =
