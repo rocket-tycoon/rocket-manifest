@@ -50,6 +50,8 @@ struct McpTestClient {
     child: Child,
     request_id: u64,
     reader: BufReader<std::process::ChildStdout>,
+    /// Home directory used by this test instance (for writing context files, etc.)
+    home_dir: std::path::PathBuf,
 }
 
 impl McpTestClient {
@@ -57,6 +59,7 @@ impl McpTestClient {
     fn spawn() -> Self {
         // Create temp directory for test database
         let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
+        let home_dir = temp_dir.path().to_path_buf();
 
         let mut child = Command::new(env!("CARGO_BIN_EXE_mfst"))
             .arg("mcp")
@@ -78,7 +81,13 @@ impl McpTestClient {
             child,
             request_id: 0,
             reader,
+            home_dir,
         }
+    }
+
+    /// Get the path where the active context file should be written
+    fn context_file_path(&self) -> std::path::PathBuf {
+        self.home_dir.join(".manifest").join("active_context.json")
     }
 
     /// Send a message as line-delimited JSON
@@ -226,6 +235,7 @@ mod protocol {
         assert!(tool_names.contains(&"add_project_directory"));
         assert!(tool_names.contains(&"create_feature"));
         assert!(tool_names.contains(&"plan_features"));
+        assert!(tool_names.contains(&"get_active_feature"));
     }
 
     #[test]
@@ -471,7 +481,7 @@ mod tool_calls {
     }
 
     /// Helper to extract text content from MCP tool response
-    fn extract_text_content(response: &JsonRpcResponse) -> String {
+    pub fn extract_text_content(response: &JsonRpcResponse) -> String {
         response
             .result
             .as_ref()
@@ -482,6 +492,127 @@ mod tool_calls {
             .and_then(|t| t.as_str())
             .expect("Expected text content in response")
             .to_string()
+    }
+}
+
+// ============================================================
+// Active Feature Context Tests
+// ============================================================
+
+mod active_feature {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn returns_null_when_no_context_file() {
+        let mut client = McpTestClient::spawn();
+        client.initialize();
+
+        let response = client.call_tool("get_active_feature", json!({}));
+        assert!(response.error.is_none(), "Expected success, got error");
+
+        let text = tool_calls::extract_text_content(&response);
+        let result: Value = serde_json::from_str(&text).expect("Expected JSON");
+
+        assert!(
+            result.get("active_feature").unwrap().is_null(),
+            "Expected active_feature to be null"
+        );
+        assert!(result.get("message").is_some(), "Expected message field");
+    }
+
+    #[test]
+    fn returns_feature_when_context_file_exists() {
+        let mut client = McpTestClient::spawn();
+        client.initialize();
+
+        // Write context file to the test's home directory
+        let context_path = client.context_file_path();
+        fs::create_dir_all(context_path.parent().unwrap()).unwrap();
+        let context = json!({
+            "feature_id": "550e8400-e29b-41d4-a716-446655440000",
+            "title": "Test Feature",
+            "updated_at": "2024-01-15T10:30:00Z"
+        });
+        fs::write(
+            &context_path,
+            serde_json::to_string_pretty(&context).unwrap(),
+        )
+        .unwrap();
+
+        let response = client.call_tool("get_active_feature", json!({}));
+        assert!(response.error.is_none(), "Expected success, got error");
+
+        let text = tool_calls::extract_text_content(&response);
+        let result: Value = serde_json::from_str(&text).expect("Expected JSON");
+
+        let active = result
+            .get("active_feature")
+            .expect("Expected active_feature");
+        assert!(!active.is_null(), "Expected active_feature to not be null");
+        assert_eq!(
+            active.get("feature_id").and_then(|f| f.as_str()),
+            Some("550e8400-e29b-41d4-a716-446655440000")
+        );
+        assert_eq!(
+            active.get("title").and_then(|t| t.as_str()),
+            Some("Test Feature")
+        );
+    }
+
+    #[test]
+    fn returns_error_for_invalid_json_in_context_file() {
+        let mut client = McpTestClient::spawn();
+        client.initialize();
+
+        // Write invalid JSON to context file
+        let context_path = client.context_file_path();
+        fs::create_dir_all(context_path.parent().unwrap()).unwrap();
+        fs::write(&context_path, "not valid json").unwrap();
+
+        let response = client.call_tool("get_active_feature", json!({}));
+
+        // Should return an error (either in error field or isError in result)
+        let is_error = response.error.is_some()
+            || response
+                .result
+                .as_ref()
+                .and_then(|r| r.get("isError"))
+                .and_then(|e| e.as_bool())
+                .unwrap_or(false);
+
+        assert!(is_error, "Expected error for invalid JSON");
+    }
+
+    #[test]
+    fn preserves_all_context_fields() {
+        let mut client = McpTestClient::spawn();
+        client.initialize();
+
+        // Write context with extra fields
+        let context_path = client.context_file_path();
+        fs::create_dir_all(context_path.parent().unwrap()).unwrap();
+        let context = json!({
+            "feature_id": "123e4567-e89b-12d3-a456-426614174000",
+            "title": "Feature with Details",
+            "updated_at": "2024-01-15T12:00:00Z",
+            "extra_field": "should be preserved"
+        });
+        fs::write(
+            &context_path,
+            serde_json::to_string_pretty(&context).unwrap(),
+        )
+        .unwrap();
+
+        let response = client.call_tool("get_active_feature", json!({}));
+        let text = tool_calls::extract_text_content(&response);
+        let result: Value = serde_json::from_str(&text).expect("Expected JSON");
+
+        let active = result.get("active_feature").unwrap();
+        assert_eq!(
+            active.get("extra_field").and_then(|f| f.as_str()),
+            Some("should be preserved")
+        );
     }
 }
 
