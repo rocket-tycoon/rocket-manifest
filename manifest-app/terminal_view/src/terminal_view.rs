@@ -2,9 +2,11 @@
 
 use gpui::{
     App, AsyncWindowContext, Context, Entity, EventEmitter, FocusHandle, Focusable,
-    InteractiveElement, IntoElement, KeyDownEvent, ParentElement, Render, Rgba, ScrollHandle,
-    SharedString, StatefulInteractiveElement, Styled, WeakEntity, Window, div, prelude::*, px,
+    InteractiveElement, IntoElement, KeyDownEvent, ModifiersChangedEvent, MouseButton,
+    MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, Render, Styled, WeakEntity,
+    Window, div, prelude::*, px,
 };
+use gpui_component::ActiveTheme;
 use terminal::{
     Event as TerminalEvent, Terminal, TerminalBuilder, mappings::colors::TerminalColors,
 };
@@ -25,73 +27,12 @@ struct TerminalTab {
     terminal: Option<Entity<Terminal>>,
 }
 
-/// Tab bar colors (Pigs in Space theme).
-mod colors {
-    use gpui::Rgba;
-
-    pub fn tab_bar_bg() -> Rgba {
-        Rgba {
-            r: 0.082,
-            g: 0.098,
-            b: 0.118,
-            a: 1.0,
-        } // #15191e - darker than panel for contrast
-    }
-
-    pub fn active_tab_bg() -> Rgba {
-        Rgba {
-            r: 0.129,
-            g: 0.149,
-            b: 0.173,
-            a: 1.0,
-        } // #21262c - terminal background
-    }
-
-    pub fn hover_bg() -> Rgba {
-        Rgba {
-            r: 0.243,
-            g: 0.275,
-            b: 0.302,
-            a: 1.0,
-        } // #3e464d
-    }
-
-    pub fn border() -> Rgba {
-        Rgba {
-            r: 0.176,
-            g: 0.2,
-            b: 0.227,
-            a: 1.0,
-        } // #2d333a
-    }
-
-    pub fn text() -> Rgba {
-        Rgba {
-            r: 0.761,
-            g: 0.839,
-            b: 0.918,
-            a: 1.0,
-        } // #c2d6ea
-    }
-
-    pub fn text_muted() -> Rgba {
-        Rgba {
-            r: 0.471,
-            g: 0.522,
-            b: 0.608,
-            a: 1.0,
-        } // #78859b
-    }
-}
-
 /// GPUI view that contains and renders multiple terminal tabs.
 pub struct TerminalView {
     tabs: Vec<TerminalTab>,
     active_tab_idx: usize,
     next_tab_id: usize,
     focus_handle: FocusHandle,
-    /// Scroll handle for horizontal tab bar scrolling (like Zed).
-    tab_bar_scroll_handle: ScrollHandle,
 }
 
 impl TerminalView {
@@ -104,7 +45,6 @@ impl TerminalView {
             active_tab_idx: 0,
             next_tab_id: 0,
             focus_handle,
-            tab_bar_scroll_handle: ScrollHandle::new(),
         };
 
         // Create the first tab
@@ -121,7 +61,6 @@ impl TerminalView {
             active_tab_idx: 0,
             next_tab_id: 1,
             focus_handle,
-            tab_bar_scroll_handle: ScrollHandle::new(),
         };
 
         let tab = TerminalTab {
@@ -137,8 +76,6 @@ impl TerminalView {
     /// Add a new terminal tab and switch to it.
     fn add_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.create_tab_internal(window, cx);
-        self.tab_bar_scroll_handle
-            .scroll_to_item(self.active_tab_idx);
         cx.notify();
     }
 
@@ -187,7 +124,6 @@ impl TerminalView {
     fn switch_tab(&mut self, idx: usize, cx: &mut Context<Self>) {
         if idx < self.tabs.len() && idx != self.active_tab_idx {
             self.active_tab_idx = idx;
-            self.tab_bar_scroll_handle.scroll_to_item(idx);
             cx.notify();
         }
     }
@@ -196,8 +132,6 @@ impl TerminalView {
     fn next_tab(&mut self, cx: &mut Context<Self>) {
         if self.tabs.len() > 1 {
             self.active_tab_idx = (self.active_tab_idx + 1) % self.tabs.len();
-            self.tab_bar_scroll_handle
-                .scroll_to_item(self.active_tab_idx);
             cx.notify();
         }
     }
@@ -210,8 +144,6 @@ impl TerminalView {
             } else {
                 self.active_tab_idx - 1
             };
-            self.tab_bar_scroll_handle
-                .scroll_to_item(self.active_tab_idx);
             cx.notify();
         }
     }
@@ -266,10 +198,118 @@ impl TerminalView {
                         this.close_tab(tab_idx, cx);
                         cx.emit(Event::Closed);
                     }
+                    TerminalEvent::OpenUrl(url) => {
+                        // Open URL in default browser
+                        if let Err(e) = open::that(url) {
+                            eprintln!("Failed to open URL: {}", e);
+                        }
+                    }
                 }
             },
         )
         .detach();
+    }
+
+    fn on_mouse_down(
+        &mut self,
+        event: &MouseDownEvent,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(tab) = self.tabs.get(self.active_tab_idx) {
+            if let Some(terminal) = &tab.terminal {
+                // Get terminal bounds to calculate position relative to content area
+                let bounds_origin = terminal
+                    .read(cx)
+                    .last_content()
+                    .terminal_bounds
+                    .bounds
+                    .origin;
+
+                // Convert window position to position relative to terminal content origin
+                let content_position = gpui::point(
+                    event.position.x - bounds_origin.x,
+                    event.position.y - bounds_origin.y,
+                );
+
+                terminal.update(cx, |terminal, _cx| {
+                    terminal.mouse_down(event.button, content_position, event.modifiers);
+                });
+            }
+        }
+    }
+
+    fn on_mouse_up(&mut self, event: &MouseUpEvent, _window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(tab) = self.tabs.get(self.active_tab_idx) {
+            if let Some(terminal) = &tab.terminal {
+                // Get terminal bounds to calculate position relative to content area
+                let bounds_origin = terminal
+                    .read(cx)
+                    .last_content()
+                    .terminal_bounds
+                    .bounds
+                    .origin;
+
+                // Convert window position to position relative to terminal content origin
+                let content_position = gpui::point(
+                    event.position.x - bounds_origin.x,
+                    event.position.y - bounds_origin.y,
+                );
+
+                terminal.update(cx, |terminal, cx| {
+                    terminal.mouse_up(event.button, content_position, event.modifiers, cx);
+                });
+            }
+        }
+    }
+
+    fn on_mouse_move(
+        &mut self,
+        event: &MouseMoveEvent,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(tab) = self.tabs.get(self.active_tab_idx) {
+            if let Some(terminal) = &tab.terminal {
+                // Get terminal bounds to calculate position relative to content area
+                let bounds_origin = terminal
+                    .read(cx)
+                    .last_content()
+                    .terminal_bounds
+                    .bounds
+                    .origin;
+
+                // Convert window position to position relative to terminal content origin
+                let content_position = gpui::point(
+                    event.position.x - bounds_origin.x,
+                    event.position.y - bounds_origin.y,
+                );
+
+                terminal.update(cx, |terminal, _cx| {
+                    terminal.mouse_move(content_position, event.modifiers);
+                });
+                cx.notify();
+            }
+        }
+    }
+
+    fn on_modifiers_changed(
+        &mut self,
+        event: &ModifiersChangedEvent,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        // When Cmd is released, clear the hyperlink hover state
+        if !event.modifiers.platform {
+            if let Some(tab) = self.tabs.get(self.active_tab_idx) {
+                if let Some(terminal) = &tab.terminal {
+                    terminal.update(cx, |terminal, _cx| {
+                        terminal.clear_hovered_hyperlink();
+                    });
+                    cx.notify();
+                }
+            }
+        }
     }
 
     fn on_key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
@@ -301,7 +341,7 @@ impl TerminalView {
     }
 
     /// Render the active terminal content.
-    fn render_terminal_content(&self, window: &mut Window) -> impl IntoElement {
+    fn render_terminal_content(&self, window: &mut Window, cx: &App) -> impl IntoElement {
         let focused = self.focus_handle.is_focused(window);
         let bg_color: gpui::Hsla = TerminalColors::background().into();
 
@@ -325,7 +365,7 @@ impl TerminalView {
                     .items_center()
                     .justify_center()
                     .font_family("IBM Plex Sans")
-                    .text_color(colors::text_muted())
+                    .text_color(cx.theme().muted_foreground)
                     .child("Starting terminal...")
                     .into_any_element()
             }
@@ -338,7 +378,7 @@ impl TerminalView {
                 .items_center()
                 .justify_center()
                 .font_family("IBM Plex Sans")
-                .text_color(colors::text_muted())
+                .text_color(cx.theme().muted_foreground)
                 .child("No terminal")
                 .into_any_element()
         }
@@ -355,112 +395,118 @@ impl Focusable for TerminalView {
 
 impl Render for TerminalView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // Collect tab data first to avoid borrow issues
+        // Render terminal content
+        let terminal_content = self.render_terminal_content(window, cx);
         let can_close = self.tabs.len() > 1;
-        let tab_data: Vec<(usize, usize, String, bool)> = self
-            .tabs
-            .iter()
-            .enumerate()
-            .map(|(idx, tab)| (idx, tab.id, tab.title.clone(), idx == self.active_tab_idx))
-            .collect();
+        let border_color = cx.theme().border;
+        let tab_bar_bg = cx.theme().tab_bar;
+        let tab_active_bg = cx.theme().tab_active;
+        let text_color = cx.theme().tab_foreground;
+        let text_active_color = cx.theme().tab_active_foreground;
+        let hover_bg = cx.theme().secondary_hover;
 
-        // Render tabs from collected data
-        let mut tab_elements = Vec::new();
-        for (idx, tab_id, title, is_active) in tab_data {
-            let title: SharedString = title.into();
+        // Build custom tab bar
+        let mut tabs_container = div().flex().items_center().h(px(32.0));
 
-            // Selected tab: terminal bg, no bottom border, bright text
-            // Non-selected: panel bg, has bottom border, dimmed text
-            let tab_bg = if is_active {
-                colors::active_tab_bg()
+        for (idx, tab) in self.tabs.iter().enumerate() {
+            let close_idx = idx;
+            let is_selected = idx == self.active_tab_idx;
+            let tab_bg = if is_selected {
+                tab_active_bg
             } else {
-                colors::tab_bar_bg()
+                tab_bar_bg
             };
-            let text_color = if is_active {
-                colors::text()
+            let tab_text = if is_selected {
+                text_active_color
             } else {
-                colors::text_muted()
-            };
-            let icon_color = if is_active {
-                colors::text_muted()
-            } else {
-                colors::text_muted()
+                text_color
             };
 
-            let el = div()
-                .id(SharedString::from(format!("tab-{}", tab_id)))
+            let tab_element = div()
+                .id(idx)
                 .h_full()
-                .flex_shrink_0() // Don't compress tabs - scroll instead
-                .px(px(12.0))
                 .flex()
-                .flex_row()
                 .items_center()
-                .gap(px(6.0))
+                .px(px(4.0))
                 .bg(tab_bg)
-                .border_r_1()
-                .border_color(colors::border())
-                // Non-selected tabs have bottom border to separate from terminal
-                .when(!is_active, |el| el.border_b_1())
-                // Only show hover state on non-selected tabs
-                .when(!is_active, |el| el.hover(|s| s.bg(colors::hover_bg())))
-                .on_click(cx.listener(move |this, _, _, cx| {
+                .border_1()
+                .border_color(border_color)
+                .when(is_selected, |d| d.border_b_0())
+                .text_color(tab_text)
+                .font_family("IBM Plex Sans")
+                .text_size(px(13.0))
+                .cursor_pointer()
+                .when(!is_selected, |d| d.hover(|s| s.bg(hover_bg)))
+                .on_click(cx.listener(move |this, _, _window, cx| {
                     this.switch_tab(idx, cx);
                 }))
-                // Terminal icon
-                .child(div().font_family("IBM Plex Sans").text_size(px(12.0)).text_color(icon_color).child(">_"))
-                // Title
+                // Terminal icon prefix
                 .child(
                     div()
-                        .font_family("IBM Plex Sans")
-                        .text_size(px(13.0))
-                        .text_color(text_color)
-                        .child(title),
+                        .pl(px(8.0))
+                        .pr(px(6.0))
+                        .text_size(px(11.0))
+                        .text_color(cx.theme().muted_foreground)
+                        .child(">_"),
                 )
-                // Close button
-                .when(can_close, |el| {
-                    el.child(
+                // Tab label
+                .child(div().px(px(4.0)).child(tab.title.clone()))
+                // Close button (if closeable)
+                .when(can_close, |d| {
+                    d.child(
                         div()
-                            .id(SharedString::from(format!("close-{}", tab_id)))
+                            .id(format!("close-{}", idx))
                             .ml(px(4.0))
+                            .mr(px(4.0))
                             .w(px(16.0))
                             .h(px(16.0))
                             .flex()
                             .items_center()
                             .justify_center()
-                            .font_family("IBM Plex Sans")
-                            .text_size(px(14.0))
-                            .text_color(colors::text_muted())
                             .rounded(px(3.0))
-                            .hover(|s| s.bg(colors::hover_bg()).text_color(colors::text()))
+                            .text_size(px(14.0))
+                            .text_color(cx.theme().muted_foreground)
+                            .hover(|s| {
+                                s.bg(cx.theme().list_hover)
+                                    .text_color(cx.theme().foreground)
+                            })
+                            .cursor_pointer()
                             .on_click(cx.listener(move |this, _, _, cx| {
-                                this.close_tab(idx, cx);
+                                this.close_tab(close_idx, cx);
                             }))
                             .child("×"),
                     )
                 });
-            tab_elements.push(el);
+
+            tabs_container = tabs_container.child(tab_element);
         }
 
-        // Add button (also has bottom border like non-selected tabs)
+        // Add "+" button
         let add_button = div()
-            .id("add-tab")
+            .id("add-terminal")
+            .px(px(8.0))
             .h_full()
-            .px(px(12.0))
             .flex()
             .items_center()
-            .border_b_1()
-            .border_color(colors::border())
             .font_family("IBM Plex Sans")
             .text_size(px(16.0))
-            .text_color(colors::text_muted())
-            .hover(|s| s.text_color(colors::text()))
+            .text_color(cx.theme().muted_foreground)
+            .hover(|s| s.text_color(cx.theme().foreground))
+            .cursor_pointer()
             .on_click(cx.listener(|this, _, window, cx| {
                 this.add_tab(window, cx);
             }))
             .child("+");
 
-        // Render terminal content
-        let terminal_content = self.render_terminal_content(window);
+        let tab_bar = div()
+            .id("terminal-tabs")
+            .w_full()
+            .h(px(32.0))
+            .flex()
+            .items_center()
+            .bg(tab_bar_bg)
+            .child(tabs_container)
+            .child(add_button);
 
         div()
             .id("terminal-view")
@@ -470,50 +516,12 @@ impl Render for TerminalView {
             .track_focus(&self.focus_handle)
             .key_context("Terminal")
             .on_key_down(cx.listener(Self::on_key_down))
-            // Tab bar (no global bottom border - each element manages its own)
-            .child(
-                div()
-                    .id("tab-bar")
-                    .h(px(32.0))
-                    .w_full()
-                    .flex_shrink_0()
-                    .overflow_hidden() // Constrain children to tab bar width
-                    .flex()
-                    .flex_row()
-                    .bg(colors::tab_bar_bg())
-                    // Wrapper: flex item that takes remaining space (constrained by parent)
-                    .child(
-                        div()
-                            .id("tab-scroll-wrapper")
-                            .flex_1()
-                            .flex_shrink()
-                            .flex_basis(px(0.0)) // Start at 0, grow to fill - don't size from content
-                            .min_w(px(0.0)) // Override content-based minimum width
-                            .h_full()
-                            .overflow_hidden()
-                            // Inner scroll container: fills wrapper, scrolls content
-                            .child(
-                                div()
-                                    .id("tab-scroll-container")
-                                    .w_full()
-                                    .h_full()
-                                    .overflow_x_scroll()
-                                    .track_scroll(&self.tab_bar_scroll_handle)
-                                    .flex()
-                                    .flex_row()
-                                    .children(tab_elements),
-                            ),
-                    )
-                    .child(add_button)
-                    // Right toolbar area - will contain buttons in future
-                    .child(
-                        div()
-                            .w(px(10.0))
-                            .h_full()
-                            .border_l_1()
-                            .border_color(colors::border()),
-                    ),
-            )
+            .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
+            .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
+            .on_mouse_move(cx.listener(Self::on_mouse_move))
+            .on_modifiers_changed(cx.listener(Self::on_modifiers_changed))
+            // Tab bar
+            .child(tab_bar)
             // Terminal content area
             .child(
                 div()

@@ -1,5 +1,9 @@
 //! Custom GPUI Element for rendering the terminal grid.
 
+use alacritty_terminal::index::Point as AlacPoint;
+use alacritty_terminal::term::cell::Flags;
+use alacritty_terminal::term::search::Match;
+use alacritty_terminal::vte::ansi::CursorShape;
 use gpui::{
     App, Bounds, Element, ElementId, FocusHandle, Font, FontStyle, FontWeight, GlobalElementId,
     Hitbox, HitboxBehavior, Hsla, InspectorElementId, IntoElement, LayoutId, Pixels, Point,
@@ -12,9 +16,6 @@ use terminal::{
     Mode, Terminal, TerminalBounds, TerminalContent,
     mappings::colors::{TerminalColors, convert_color},
 };
-
-use alacritty_terminal::term::cell::Flags;
-use alacritty_terminal::vte::ansi::CursorShape;
 
 /// Layout state computed during prepaint, used for painting.
 pub struct LayoutState {
@@ -76,6 +77,7 @@ impl TerminalElement {
 
         let fg_default = TerminalColors::foreground();
         let bg_default = TerminalColors::background();
+        let link_color: Hsla = TerminalColors::ansi_blue().into();
 
         // Group cells by line
         for (line_idx, line_cells) in &content.cells.iter().chunk_by(|c| c.point.line.0) {
@@ -86,10 +88,14 @@ impl TerminalElement {
             let mut current_fg: Hsla = fg_default.into();
             let mut current_start_col = 0i32;
             let mut current_flags = Flags::empty();
+            let mut current_is_link = false;
 
             for cell in line_cells {
                 let col = cell.point.column.0 as i32;
                 let x = origin.x + (col as f32) * cell_width;
+
+                // Check if this cell is part of a hovered hyperlink
+                let is_link = Self::is_in_hyperlink(&cell.point, &content.hovered_hyperlink);
 
                 // Get cell colors, respecting INVERSE flag for reverse video
                 // TUI apps like Claude Code use reverse video to render their cursors
@@ -98,6 +104,9 @@ impl TerminalElement {
                 } else {
                     (convert_color(&cell.fg), convert_color(&cell.bg))
                 };
+
+                // Use link color for hovered hyperlinks
+                let fg_color = if is_link { link_color } else { fg_color };
 
                 // Draw background if not default
                 let bg_rgba: gpui::Rgba = bg_color.into();
@@ -118,13 +127,15 @@ impl TerminalElement {
                     let new_rgba: gpui::Rgba = fg_color.into();
                     current_rgba != new_rgba
                 };
+                let link_changed = is_link != current_is_link;
 
-                if fg_changed && !current_text.is_empty() {
+                if (fg_changed || link_changed) && !current_text.is_empty() {
                     // Flush current text run
                     if let Some(text_run) = self.shape_text_run(
                         &current_text,
                         current_fg,
                         current_flags,
+                        current_is_link,
                         point(origin.x + (current_start_col as f32) * cell_width, y),
                         window,
                         cx,
@@ -139,6 +150,7 @@ impl TerminalElement {
                     current_start_col = col;
                     current_fg = fg_color;
                     current_flags = cell.flags;
+                    current_is_link = is_link;
                 }
 
                 // Add character to current run
@@ -151,6 +163,7 @@ impl TerminalElement {
                         &current_text,
                         current_fg,
                         current_flags,
+                        current_is_link,
                         point(origin.x + (current_start_col as f32) * cell_width, y),
                         window,
                         cx,
@@ -167,6 +180,7 @@ impl TerminalElement {
                     &current_text,
                     current_fg,
                     current_flags,
+                    current_is_link,
                     point(origin.x + (current_start_col as f32) * cell_width, y),
                     window,
                     cx,
@@ -179,11 +193,21 @@ impl TerminalElement {
         (background_rects, text_runs)
     }
 
+    /// Check if a grid point is within the hovered hyperlink range.
+    fn is_in_hyperlink(point: &AlacPoint, hovered: &Option<Match>) -> bool {
+        if let Some(range) = hovered {
+            range.contains(point)
+        } else {
+            false
+        }
+    }
+
     fn shape_text_run(
         &self,
         text: &str,
         color: Hsla,
         flags: Flags,
+        is_link: bool,
         position: Point<Pixels>,
         window: &mut Window,
         _cx: &mut App,
@@ -199,7 +223,8 @@ impl TerminalElement {
             FontWeight::NORMAL
         };
 
-        let underline = if flags.contains(Flags::UNDERLINE) {
+        // Add underline for links or if the UNDERLINE flag is set
+        let underline = if is_link || flags.contains(Flags::UNDERLINE) {
             Some(UnderlineStyle {
                 color: Some(color),
                 thickness: px(1.0),
