@@ -1,12 +1,21 @@
 //! Feature Panel - A tree view for displaying Manifest features.
+//!
+//! Uses gpui-component's Tree for keyboard navigation and virtualized rendering.
 
-use std::collections::HashSet;
+use std::collections::HashMap;
+use std::rc::Rc;
 
 use gpui::{
-    App, Context, EventEmitter, FocusHandle, Focusable, InteractiveElement, IntoElement,
-    ParentElement, Render, ScrollWheelEvent, SharedString, StatefulInteractiveElement, Styled,
-    Window, div, px, rgba,
+    App, AppContext, Context, Entity, EventEmitter, FocusHandle, Focusable, Hsla,
+    InteractiveElement, IntoElement, KeyBinding, MouseButton, ParentElement, Render, SharedString,
+    Styled, Window, actions, div, px, rgba,
 };
+
+// Action for opening the selected feature
+actions!(feature_panel, [OpenFeature]);
+use gpui_component::list::ListItem;
+use gpui_component::tree::{TreeItem, TreeState, tree};
+use gpui_component::{Icon, IconName};
 use manifest_client::{Feature, FeatureState};
 use uuid::Uuid;
 
@@ -30,24 +39,6 @@ mod colors {
             b: 0.157,
             a: 1.0,
         } // #1d2228 - panel.background
-    }
-
-    pub fn hover_background() -> Rgba {
-        Rgba {
-            r: 0.243,
-            g: 0.275,
-            b: 0.302,
-            a: 1.0,
-        } // #3e464d - element.hover
-    }
-
-    pub fn selected_background() -> Rgba {
-        Rgba {
-            r: 0.216,
-            g: 0.247,
-            b: 0.278,
-            a: 1.0,
-        } // #373f47 - element.selected
     }
 
     pub fn text_primary() -> Rgba {
@@ -113,42 +104,12 @@ mod colors {
             a: 1.0,
         } // #636e80 - text.muted
     }
-
-    // Scrollbar colors
-    pub fn scrollbar_track() -> Rgba {
-        Rgba {
-            r: 0.082,
-            g: 0.098,
-            b: 0.118,
-            a: 0.5,
-        } // semi-transparent dark
-    }
-
-    pub fn scrollbar_thumb() -> Rgba {
-        Rgba {
-            r: 0.243,
-            g: 0.275,
-            b: 0.302,
-            a: 0.8,
-        } // element.hover
-    }
 }
 
 /// Events emitted by the FeaturePanel.
 #[derive(Clone, Debug)]
 pub enum Event {
     FeatureSelected(Uuid),
-}
-
-/// A flattened feature entry for rendering.
-#[derive(Clone, Debug)]
-struct FlatFeature {
-    id: Uuid,
-    title: String,
-    state: FeatureState,
-    depth: usize,
-    has_children: bool,
-    is_expanded: bool,
 }
 
 /// State of data loading.
@@ -159,43 +120,91 @@ pub enum LoadState {
     Error(String),
 }
 
-/// Row height for features.
-const ROW_HEIGHT: f32 = 22.0;
-/// Scrollbar width.
-const SCROLLBAR_WIDTH: f32 = 10.0;
-/// Minimum thumb size.
-const MIN_THUMB_SIZE: f32 = 25.0;
+/// Default panel width.
+pub const DEFAULT_PANEL_WIDTH: f32 = 250.0;
+/// Minimum panel width.
+pub const MIN_PANEL_WIDTH: f32 = 150.0;
+/// Maximum panel width.
+pub const MAX_PANEL_WIDTH: f32 = 500.0;
+
+/// Metadata for a feature (state, has_children) keyed by tree item ID.
+#[derive(Clone)]
+struct FeatureMetadata {
+    id: Uuid,
+    state: FeatureState,
+    has_children: bool,
+}
+
+/// Special ID used for the directory root node.
+const DIRECTORY_ROOT_ID: &str = "__directory_root__";
 
 /// GPUI Entity for displaying a feature tree.
 pub struct FeaturePanel {
-    features: Vec<Feature>,
-    expanded_ids: HashSet<Uuid>,
-    selected_id: Option<Uuid>,
+    tree_state: Entity<TreeState>,
     focus_handle: FocusHandle,
     load_state: LoadState,
-    /// Scroll offset in pixels.
-    scroll_offset: f32,
-    /// Visible height of the content area.
-    visible_height: f32,
+    width: f32,
+    /// Metadata for features, keyed by tree item ID string.
+    /// Wrapped in Rc for cheap cloning in render closures.
+    feature_metadata: Rc<HashMap<String, FeatureMetadata>>,
+    /// Flag to track if selection change was caused by a click.
+    pending_click_open: bool,
+    /// Directory name shown as root node of the feature tree.
+    directory_name: Option<String>,
 }
 
 impl FeaturePanel {
     /// Create a new empty feature panel.
     pub fn new(cx: &mut Context<Self>) -> Self {
+        let tree_state = cx.new(|cx| TreeState::new(cx));
+
+        // Observe tree state changes to detect click-triggered selection
+        cx.observe(&tree_state, |this, _state, cx| {
+            this.on_tree_selection_changed(cx);
+        })
+        .detach();
+
         Self {
-            features: Vec::new(),
-            expanded_ids: HashSet::new(),
-            selected_id: None,
+            tree_state,
             focus_handle: cx.focus_handle(),
             load_state: LoadState::Loading,
-            scroll_offset: 0.0,
-            visible_height: 400.0,
+            width: DEFAULT_PANEL_WIDTH,
+            feature_metadata: Rc::new(HashMap::new()),
+            pending_click_open: false,
+            directory_name: None,
         }
     }
 
-    /// Set the features to display.
-    pub fn set_features(&mut self, features: Vec<Feature>, cx: &mut Context<Self>) {
-        self.features = features;
+    /// Set the panel width.
+    pub fn set_width(&mut self, width: f32, cx: &mut Context<Self>) {
+        self.width = width.clamp(MIN_PANEL_WIDTH, MAX_PANEL_WIDTH);
+        cx.notify();
+    }
+
+    /// Get the current panel width.
+    pub fn width(&self) -> f32 {
+        self.width
+    }
+
+    /// Set the features to display, with optional directory name as root.
+    pub fn set_features(
+        &mut self,
+        features: Vec<Feature>,
+        directory_name: Option<String>,
+        cx: &mut Context<Self>,
+    ) {
+        self.directory_name = directory_name.clone();
+
+        // Convert features to TreeItems and collect metadata
+        let (tree_items, metadata) =
+            Self::convert_features_to_tree_items(&features, directory_name.as_deref());
+        self.feature_metadata = Rc::new(metadata);
+
+        // Update tree state
+        self.tree_state.update(cx, |state, cx| {
+            state.set_items(tree_items, cx);
+        });
+
         self.load_state = LoadState::Loaded;
         cx.notify();
     }
@@ -206,212 +215,105 @@ impl FeaturePanel {
         cx.notify();
     }
 
-    /// Toggle expansion of a feature.
-    fn toggle_expanded(&mut self, id: Uuid, cx: &mut Context<Self>) {
-        if self.expanded_ids.contains(&id) {
-            self.expanded_ids.remove(&id);
-        } else {
-            self.expanded_ids.insert(id);
-        }
-        cx.notify();
-    }
-
-    /// Select a feature.
-    fn select_feature(&mut self, id: Uuid, cx: &mut Context<Self>) {
-        self.selected_id = Some(id);
-        cx.emit(Event::FeatureSelected(id));
-        cx.notify();
-    }
-
-    /// Handle scroll wheel events.
-    fn on_scroll_wheel(
-        &mut self,
-        event: &ScrollWheelEvent,
-        _window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let flat_features = self.flatten_features();
-        let content_height = flat_features.len() as f32 * ROW_HEIGHT;
-        let max_scroll = (content_height - self.visible_height).max(0.0);
-
-        // Get scroll delta
-        let delta_y = event.delta.pixel_delta(px(ROW_HEIGHT)).y / px(1.0);
-        let new_offset = (self.scroll_offset - delta_y).clamp(0.0, max_scroll);
-
-        if (new_offset - self.scroll_offset).abs() > 0.01 {
-            self.scroll_offset = new_offset;
-            cx.notify();
+    /// Handle tree selection changes - only open if triggered by a click.
+    fn on_tree_selection_changed(&mut self, cx: &mut Context<Self>) {
+        if self.pending_click_open {
+            self.pending_click_open = false;
+            self.open_selected_feature(cx);
         }
     }
 
-    /// Render the scrollbar.
-    fn render_scrollbar(&self, content_height: f32) -> impl IntoElement {
-        let viewport_height = self.visible_height;
+    /// Open the currently selected feature (emit FeatureSelected event).
+    /// Called when user presses Enter or clicks on a leaf item.
+    fn open_selected_feature(&mut self, cx: &mut Context<Self>) {
+        let selected_id = self
+            .tree_state
+            .read(cx)
+            .selected_item()
+            .map(|item| item.id.to_string());
 
-        if content_height <= viewport_height {
-            return div().w(px(SCROLLBAR_WIDTH)).h_full().into_any_element();
-        }
-
-        let thumb_fraction = (viewport_height / content_height).clamp(0.1, 1.0);
-        let max_scroll = (content_height - viewport_height).max(0.0);
-        let thumb_position = if max_scroll > 0.0 {
-            (self.scroll_offset / max_scroll).clamp(0.0, 1.0)
-        } else {
-            0.0
-        };
-
-        let track_height = viewport_height;
-        let thumb_height = (track_height * thumb_fraction).max(MIN_THUMB_SIZE);
-        let usable_track = track_height - thumb_height;
-        let thumb_top = usable_track * thumb_position;
-
-        div()
-            .w(px(SCROLLBAR_WIDTH))
-            .h_full()
-            .bg(colors::scrollbar_track())
-            .relative()
-            .child(
-                div()
-                    .absolute()
-                    .top(px(thumb_top))
-                    .left(px(2.0))
-                    .w(px(SCROLLBAR_WIDTH - 4.0))
-                    .h(px(thumb_height))
-                    .rounded(px(3.0))
-                    .bg(colors::scrollbar_thumb()),
-            )
-            .into_any_element()
-    }
-
-    /// Flatten the feature tree for rendering.
-    fn flatten_features(&self) -> Vec<FlatFeature> {
-        let mut result = Vec::new();
-        self.flatten_recursive(&self.features, 0, &mut result);
-        result
-    }
-
-    fn flatten_recursive(&self, features: &[Feature], depth: usize, result: &mut Vec<FlatFeature>) {
-        for feature in features {
-            let is_expanded = self.expanded_ids.contains(&feature.id);
-            let has_children = !feature.children.is_empty();
-
-            result.push(FlatFeature {
-                id: feature.id,
-                title: feature.title.clone(),
-                state: feature.state,
-                depth,
-                has_children,
-                is_expanded,
-            });
-
-            // Only include children if expanded
-            if is_expanded && has_children {
-                self.flatten_recursive(&feature.children, depth + 1, result);
+        if let Some(id) = selected_id {
+            if let Some(metadata) = self.feature_metadata.get(&id) {
+                // Only open leaf features (non-folders)
+                if !metadata.has_children {
+                    cx.emit(Event::FeatureSelected(metadata.id));
+                }
             }
         }
     }
 
-    /// Render a folder icon (Zed-style geometric shape).
-    fn render_folder_icon(&self, is_expanded: bool) -> impl IntoElement {
-        let folder_color = colors::text_muted();
+    /// Action handler for OpenFeature (Enter key).
+    fn on_open_feature(&mut self, _: &OpenFeature, _window: &mut Window, cx: &mut Context<Self>) {
+        self.open_selected_feature(cx);
+    }
 
-        if is_expanded {
-            // Open folder - 3/4 view with solid front flap
-            div()
-                .w(px(16.0))
-                .h(px(16.0))
-                .flex()
-                .items_center()
-                .justify_center()
-                .child(
-                    div()
-                        .relative()
-                        .w(px(14.0))
-                        .h(px(12.0))
-                        // Tab at top-left (outline)
-                        .child(
-                            div()
-                                .absolute()
-                                .top(px(0.0))
-                                .left(px(1.0))
-                                .w(px(5.0))
-                                .h(px(3.0))
-                                .rounded_tl(px(1.0))
-                                .rounded_tr(px(1.0))
-                                .border_1()
-                                .border_b_0()
-                                .border_color(folder_color),
-                        )
-                        // Back of folder (outline rectangle)
-                        .child(
-                            div()
-                                .absolute()
-                                .top(px(2.0))
-                                .left(px(0.0))
-                                .w(px(14.0))
-                                .h(px(8.0))
-                                .rounded(px(1.0))
-                                .border_1()
-                                .border_color(folder_color),
-                        )
-                        // Front flap (solid, creates open look)
-                        .child(
-                            div()
-                                .absolute()
-                                .top(px(5.0))
-                                .left(px(0.0))
-                                .w(px(14.0))
-                                .h(px(7.0))
-                                .rounded(px(1.0))
-                                .bg(folder_color),
-                        ),
-                )
+    /// Convert Feature tree to TreeItem tree, collecting metadata.
+    /// If directory_name is provided, wraps all features under a root directory node.
+    fn convert_features_to_tree_items(
+        features: &[Feature],
+        directory_name: Option<&str>,
+    ) -> (Vec<TreeItem>, HashMap<String, FeatureMetadata>) {
+        let mut metadata = HashMap::new();
+        let feature_items = Self::convert_features_recursive(features, &mut metadata);
+
+        // If we have a directory name, wrap features under a root node
+        let items = if let Some(dir_name) = directory_name {
+            vec![
+                TreeItem::new(DIRECTORY_ROOT_ID, dir_name.to_string())
+                    .children(feature_items)
+                    .expanded(true),
+            ] // Directory starts expanded
         } else {
-            // Closed folder - complete outlined folder shape with tab
-            div()
-                .w(px(16.0))
-                .h(px(16.0))
-                .flex()
-                .items_center()
-                .justify_center()
-                .child(
-                    div()
-                        .relative()
-                        .w(px(14.0))
-                        .h(px(11.0))
-                        // Tab at top-left (outline, sticks up)
-                        .child(
-                            div()
-                                .absolute()
-                                .top(px(0.0))
-                                .left(px(1.0))
-                                .w(px(5.0))
-                                .h(px(3.0))
-                                .rounded_tl(px(1.0))
-                                .rounded_tr(px(1.0))
-                                .border_1()
-                                .border_b_0()
-                                .border_color(folder_color),
-                        )
-                        // Main folder body (outline rectangle)
-                        .child(
-                            div()
-                                .absolute()
-                                .top(px(2.0))
-                                .left(px(0.0))
-                                .w(px(14.0))
-                                .h(px(9.0))
-                                .rounded(px(1.0))
-                                .border_1()
-                                .border_color(folder_color),
-                        ),
-                )
-        }
+            feature_items
+        };
+
+        (items, metadata)
+    }
+
+    fn convert_features_recursive(
+        features: &[Feature],
+        metadata: &mut HashMap<String, FeatureMetadata>,
+    ) -> Vec<TreeItem> {
+        features
+            .iter()
+            .map(|feature| {
+                let id_str = feature.id.to_string();
+                let has_children = !feature.children.is_empty();
+
+                // Store metadata keyed by item ID
+                metadata.insert(
+                    id_str.clone(),
+                    FeatureMetadata {
+                        id: feature.id,
+                        state: feature.state,
+                        has_children,
+                    },
+                );
+
+                let children = Self::convert_features_recursive(&feature.children, metadata);
+
+                TreeItem::new(id_str, feature.title.clone())
+                    .children(children)
+                    .expanded(false) // Start collapsed
+            })
+            .collect()
+    }
+
+    /// Render a folder icon using gpui-component's SVG icons.
+    fn render_folder_icon(is_expanded: bool) -> impl IntoElement {
+        let icon_name = if is_expanded {
+            IconName::FolderOpen
+        } else {
+            IconName::FolderClosed
+        };
+        Icon::new(icon_name)
+            .size_4()
+            .text_color(Hsla::from(colors::text_muted()))
     }
 
     /// Render a proposed state icon: small amber solid circle.
-    /// Size: 8px - this becomes the "inner dot" reference for the progression.
-    fn render_proposed_icon(&self) -> impl IntoElement {
+    /// Using a simple single div for performance.
+    fn render_proposed_icon() -> impl IntoElement {
         div()
             .w(px(16.0))
             .h(px(16.0))
@@ -428,9 +330,8 @@ impl FeaturePanel {
     }
 
     /// Render a specified state icon: green donut/ring.
-    /// Outer: 14px (same as implemented), hole: 8px (same as proposed dot).
-    fn render_specified_icon(&self) -> impl IntoElement {
-        // Border of 3px creates: outer 14px, inner hole 8px (14 - 3*2 = 8)
+    /// Using a simple single div with border for performance.
+    fn render_specified_icon() -> impl IntoElement {
         div()
             .w(px(16.0))
             .h(px(16.0))
@@ -439,17 +340,17 @@ impl FeaturePanel {
             .justify_center()
             .child(
                 div()
-                    .w(px(14.0))
-                    .h(px(14.0))
-                    .rounded(px(7.0))
-                    .border_3()
+                    .w(px(12.0))
+                    .h(px(12.0))
+                    .rounded(px(6.0))
+                    .border_2()
                     .border_color(colors::specified_green()),
             )
     }
 
-    /// Render an implemented state icon: blue filled circle with checkmark.
-    /// Size: 14px (same outer as specified).
-    fn render_implemented_icon(&self) -> impl IntoElement {
+    /// Render an implemented state icon: solid light blue circle.
+    /// Same radius as specified icon (12x12).
+    fn render_implemented_icon() -> impl IntoElement {
         div()
             .w(px(16.0))
             .h(px(16.0))
@@ -458,122 +359,18 @@ impl FeaturePanel {
             .justify_center()
             .child(
                 div()
-                    .w(px(14.0))
-                    .h(px(14.0))
-                    .rounded(px(7.0))
-                    .bg(colors::implemented_blue())
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .child(
-                        div()
-                            .text_color(colors::implemented_check())
-                            .text_size(px(9.0))
-                            .font_weight(gpui::FontWeight::BOLD)
-                            .child("✓"),
-                    ),
+                    .w(px(12.0))
+                    .h(px(12.0))
+                    .rounded(px(6.0))
+                    .bg(colors::implemented_blue()),
             )
     }
 
-    /// Render a deprecated state icon: gray archive box.
-    fn render_deprecated_icon(&self) -> impl IntoElement {
-        div()
-            .w(px(16.0))
-            .h(px(16.0))
-            .flex()
-            .items_center()
-            .justify_center()
-            .child(
-                // Simple archive box shape: rectangle with a line near top
-                div()
-                    .w(px(12.0))
-                    .h(px(10.0))
-                    .rounded(px(1.0))
-                    .border_2()
-                    .border_color(colors::deprecated_gray()),
-            )
-    }
-
-    /// Render a single feature row.
-    fn render_feature_row(
-        &self,
-        feature: &FlatFeature,
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement + use<> {
-        let id = feature.id;
-        let is_selected = self.selected_id == Some(id);
-        let depth = feature.depth;
-        let has_children = feature.has_children;
-        let is_expanded = feature.is_expanded;
-        let state = feature.state;
-        let title: SharedString = feature.title.clone().into();
-
-        // Zed-style indentation: base padding + depth indent
-        let indent = px(16.0 * depth as f32);
-
-        let bg_color = if is_selected {
-            colors::selected_background()
-        } else {
-            colors::panel_background()
-        };
-
-        // Disclosure triangle for expandable items (Zed-style)
-        let disclosure = if has_children {
-            if is_expanded { "▾" } else { "▸" }
-        } else {
-            " " // Space placeholder for alignment
-        };
-
-        // Build the icon element based on type
-        let icon_element = if has_children {
-            self.render_folder_icon(is_expanded).into_any_element()
-        } else {
-            match state {
-                FeatureState::Proposed => self.render_proposed_icon().into_any_element(),
-                FeatureState::Specified => self.render_specified_icon().into_any_element(),
-                FeatureState::Implemented => self.render_implemented_icon().into_any_element(),
-                FeatureState::Deprecated => self.render_deprecated_icon().into_any_element(),
-            }
-        };
-
-        div()
-            .id(SharedString::from(format!("feature-{}", id)))
-            .h(px(22.0))
-            .pl(indent + px(4.0))
-            .pr(px(8.0))
-            .flex()
-            .items_center()
-            .gap(px(2.0))
-            .bg(bg_color)
-            .hover(|s| s.bg(colors::hover_background()))
-            .on_click(cx.listener(move |this, _event, _window, cx| {
-                if has_children {
-                    this.toggle_expanded(id, cx);
-                }
-                this.select_feature(id, cx);
-            }))
-            // Disclosure triangle
-            .child(
-                div()
-                    .w(px(12.0))
-                    .text_color(colors::text_muted())
-                    .text_size(px(10.0))
-                    .child(disclosure),
-            )
-            // Icon (folder or state)
-            .child(icon_element)
-            // Title
-            .child(
-                div()
-                    .pl(px(4.0))
-                    .font_family("IBM Plex Sans")
-                    .text_color(colors::text_primary())
-                    .text_size(px(13.0))
-                    .overflow_hidden()
-                    .whitespace_nowrap()
-                    .text_ellipsis()
-                    .child(title),
-            )
+    /// Render a deprecated state icon using gpui-component's Inbox (archive-like).
+    fn render_deprecated_icon() -> impl IntoElement {
+        Icon::new(IconName::Inbox)
+            .size_4()
+            .text_color(Hsla::from(colors::deprecated_gray()))
     }
 }
 
@@ -589,22 +386,19 @@ impl Render for FeaturePanel {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let panel_bg = colors::panel_background();
 
-        // Calculate content height for scrollbar
-        let flat_features = self.flatten_features();
-        let content_height = flat_features.len() as f32 * ROW_HEIGHT;
+        // Cheap Rc clone for use in render closure (just increments refcount)
+        let metadata = Rc::clone(&self.feature_metadata);
 
         div()
             .id("feature-panel")
-            .w(px(250.0))
-            .min_w(px(250.0))
-            .flex_shrink_0()
-            .h_full()
+            .size_full()
             .bg(panel_bg)
-            .border_r_1()
-            .border_color(rgba(0x2d333aff)) // border from pigs-in-space
             .flex()
             .flex_col()
             .overflow_hidden()
+            .track_focus(&self.focus_handle)
+            .key_context("FeaturePanel")
+            .on_action(cx.listener(Self::on_open_feature))
             .child(
                 // Header
                 div()
@@ -614,7 +408,7 @@ impl Render for FeaturePanel {
                     .items_center()
                     .bg(colors::header_background())
                     .border_b_1()
-                    .border_color(rgba(0x2d333aff)) // border from pigs-in-space
+                    .border_color(rgba(0x2d333aff))
                     .child(
                         div()
                             .font_family("IBM Plex Sans")
@@ -625,56 +419,102 @@ impl Render for FeaturePanel {
                     ),
             )
             .child(
-                // Content area with scrollbar
+                // Tree content
                 div()
                     .id("feature-list-container")
                     .flex_1()
                     .w_full()
-                    .flex()
-                    .flex_row()
                     .overflow_hidden()
-                    .on_scroll_wheel(cx.listener(Self::on_scroll_wheel))
-                    .child(
-                        // Feature list (scrollable content)
-                        div()
-                            .id("feature-list")
-                            .flex_1()
-                            .h_full()
-                            .overflow_hidden()
-                            .child(match &self.load_state {
-                                LoadState::Loading => div()
-                                    .p(px(12.0))
-                                    .font_family("IBM Plex Sans")
-                                    .text_color(colors::text_muted())
-                                    .text_size(px(13.0))
-                                    .child("Loading features...")
-                                    .into_any_element(),
-                                LoadState::Error(err) => div()
-                                    .p(px(12.0))
-                                    .font_family("IBM Plex Sans")
-                                    .text_color(rgba(0xf14c4cff))
-                                    .text_size(px(13.0))
-                                    .child(format!("Error: {}", err))
-                                    .into_any_element(),
-                                LoadState::Loaded => {
-                                    // Render all features with scroll offset transform
-                                    let mut rows = Vec::new();
-                                    for f in &flat_features {
-                                        rows.push(self.render_feature_row(f, cx));
-                                    }
-
-                                    div()
-                                        .relative()
-                                        .top(px(-self.scroll_offset))
-                                        .flex()
-                                        .flex_col()
-                                        .children(rows)
-                                        .into_any_element()
-                                }
-                            }),
+                    // Set flag on mouse down to trigger open on selection change
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _, _, _cx| {
+                            this.pending_click_open = true;
+                        }),
                     )
-                    // Scrollbar
-                    .child(self.render_scrollbar(content_height)),
+                    .child(match &self.load_state {
+                        LoadState::Loading => div()
+                            .p(px(12.0))
+                            .font_family("IBM Plex Sans")
+                            .text_color(colors::text_muted())
+                            .text_size(px(13.0))
+                            .child("Loading features...")
+                            .into_any_element(),
+                        LoadState::Error(err) => div()
+                            .p(px(12.0))
+                            .font_family("IBM Plex Sans")
+                            .text_color(rgba(0xf14c4cff))
+                            .text_size(px(13.0))
+                            .child(format!("Error: {}", err))
+                            .into_any_element(),
+                        LoadState::Loaded => {
+                            tree(
+                                &self.tree_state,
+                                move |_ix, entry, selected, _window, _cx| {
+                                    let depth = entry.depth();
+                                    let indent = px(16.0 * depth as f32 + 8.0);
+                                    let is_expanded = entry.is_expanded();
+                                    let is_folder = entry.is_folder();
+                                    let item_id = entry.item().id.to_string();
+                                    let label: SharedString = entry.item().label.clone();
+
+                                    // Get metadata for this entry to render custom icon
+                                    let meta = metadata.get(&item_id);
+
+                                    // Render custom icon based on feature state
+                                    let icon = if is_folder {
+                                        Self::render_folder_icon(is_expanded).into_any_element()
+                                    } else if let Some(m) = meta {
+                                        match m.state {
+                                            FeatureState::Proposed => {
+                                                Self::render_proposed_icon().into_any_element()
+                                            }
+                                            FeatureState::Specified => {
+                                                Self::render_specified_icon().into_any_element()
+                                            }
+                                            FeatureState::Implemented => {
+                                                Self::render_implemented_icon().into_any_element()
+                                            }
+                                            FeatureState::Deprecated => {
+                                                Self::render_deprecated_icon().into_any_element()
+                                            }
+                                        }
+                                    } else {
+                                        Self::render_proposed_icon().into_any_element()
+                                    };
+
+                                    ListItem::new(item_id)
+                                        .py_0()
+                                        .pl(indent)
+                                        .selected(selected)
+                                        .child(
+                                            div()
+                                                .flex()
+                                                .items_center()
+                                                .gap(px(6.0))
+                                                .child(icon)
+                                                .child(
+                                                    div()
+                                                        .font_family("IBM Plex Sans")
+                                                        .text_color(colors::text_primary())
+                                                        .text_size(px(13.0))
+                                                        .overflow_hidden()
+                                                        .whitespace_nowrap()
+                                                        .text_ellipsis()
+                                                        .child(label),
+                                                ),
+                                        )
+                                },
+                            )
+                            .size_full()
+                            .into_any_element()
+                        }
+                    }),
             )
     }
+}
+
+/// Register key bindings for the feature panel.
+pub fn register_bindings(cx: &mut App) {
+    cx.bind_keys([KeyBinding::new("enter", OpenFeature, Some("FeaturePanel"))]);
 }
