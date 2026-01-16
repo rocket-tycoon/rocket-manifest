@@ -7,7 +7,7 @@ use axum::{
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::db::Database;
+use crate::db::{Database, ManifestError};
 use crate::models::*;
 
 // Import MCP types for bulk feature creation (re-exported from mcp module)
@@ -17,23 +17,29 @@ use crate::mcp::{PlanFeaturesResponse, ProposedFeature};
 // Error Handling
 // ============================================================
 
-/// Log an internal error and return a sanitized response to the client.
-/// The full error is logged server-side for debugging, but clients only
-/// see a generic message to avoid leaking internal details.
-///
-/// Some errors are validation errors that should be exposed to the client
-/// (e.g., "Sessions can only be created on leaf features"). These are
-/// returned as-is with a BAD_REQUEST status.
-fn internal_error(e: impl std::fmt::Display) -> (StatusCode, String) {
-    let msg = e.to_string();
+/// Convert a ManifestError to an HTTP response.
+/// These are domain errors that should be exposed to the client.
+fn manifest_error(e: ManifestError) -> (StatusCode, String) {
+    let status = match &e {
+        ManifestError::NotFound(_) => StatusCode::NOT_FOUND,
+        ManifestError::Validation(_) => StatusCode::BAD_REQUEST,
+        ManifestError::InvalidState(_) => StatusCode::CONFLICT,
+    };
+    tracing::warn!("Client error: {}", e);
+    (status, e.to_string())
+}
 
-    // Known validation errors that are safe to expose
-    if msg.contains("leaf") || msg.contains("not active") || msg.contains("not found") {
-        tracing::warn!("Validation error: {}", msg);
-        return (StatusCode::BAD_REQUEST, msg);
+/// Convert an anyhow::Error to an HTTP response.
+/// Checks if the error is a ManifestError (domain error) and handles it appropriately.
+/// Other errors are treated as internal server errors.
+fn internal_error(e: anyhow::Error) -> (StatusCode, String) {
+    // Check if this is a wrapped ManifestError (domain error)
+    if let Some(manifest_err) = e.downcast_ref::<ManifestError>() {
+        return manifest_error(manifest_err.clone());
     }
 
-    tracing::error!("Internal error: {}", msg);
+    // True internal error - log full details but return generic message
+    tracing::error!("Internal error: {:?}", e);
     (
         StatusCode::INTERNAL_SERVER_ERROR,
         "Internal server error".to_string(),
@@ -141,15 +147,10 @@ pub async fn list_features(
     State(db): State<Database>,
     Query(query): Query<ListFeaturesQuery>,
 ) -> Result<Json<Vec<FeatureSummary>>, (StatusCode, String)> {
-    let features = db.get_all_features().map_err(internal_error)?;
-
-    // Apply pagination
-    let offset = query.offset.unwrap_or(0) as usize;
-    let features: Vec<_> = features.into_iter().skip(offset).collect();
-    let features: Vec<_> = match query.limit {
-        Some(limit) => features.into_iter().take(limit as usize).collect(),
-        None => features,
-    };
+    // Use SQL-based pagination for efficiency
+    let features = db
+        .get_all_features_paginated(query.limit, query.offset)
+        .map_err(internal_error)?;
 
     // Always return summaries only - use get_feature for full details
     let summaries: Vec<FeatureSummary> = features.into_iter().map(Into::into).collect();
@@ -161,18 +162,10 @@ pub async fn list_project_features(
     Path(project_id): Path<Uuid>,
     Query(query): Query<ListFeaturesQuery>,
 ) -> Result<Json<Vec<FeatureSummary>>, (StatusCode, String)> {
+    // Use SQL-based pagination for efficiency
     let features = db
-        .get_features_by_project(project_id)
+        .get_features_by_project_paginated(project_id, query.limit, query.offset)
         .map_err(internal_error)?;
-
-    // Apply pagination
-    let offset = query.offset.unwrap_or(0) as usize;
-    let features: Vec<_> = features.into_iter().skip(offset).collect();
-    let features: Vec<_> = match query.limit {
-        Some(limit) => features.into_iter().take(limit as usize).collect(),
-        None => features,
-    };
-
     // Always return summaries only - use get_feature for full details
     let summaries: Vec<FeatureSummary> = features.into_iter().map(Into::into).collect();
     Ok(Json(summaries))
@@ -479,11 +472,16 @@ pub async fn bulk_create_features(
     let mut created_ids = Vec::new();
 
     if input.confirm {
-        // Create features recursively
+        // Flatten the tree into a list of inputs with pre-generated UUIDs
+        // This allows us to use the transactional bulk insert
+        let mut feature_inputs = Vec::new();
         for feature in &input.features {
-            create_feature_recursive(&db, project_id, None, feature, &mut created_ids)
-                .map_err(internal_error)?;
+            flatten_feature_tree(None, feature, &mut feature_inputs, &mut created_ids);
         }
+
+        // Create all features in a single transaction
+        db.create_features_bulk(project_id, feature_inputs)
+            .map_err(internal_error)?;
     }
 
     Ok(Json(PlanFeaturesResponse {
@@ -493,31 +491,30 @@ pub async fn bulk_create_features(
     }))
 }
 
-/// Recursively create features from a ProposedFeature tree.
-fn create_feature_recursive(
-    db: &Database,
-    project_id: Uuid,
+/// Flatten a ProposedFeature tree into a list of CreateFeatureInput.
+/// Pre-generates UUIDs so parent-child relationships can be established.
+fn flatten_feature_tree(
     parent_id: Option<Uuid>,
     proposed: &ProposedFeature,
+    inputs: &mut Vec<CreateFeatureInput>,
     created_ids: &mut Vec<String>,
-) -> anyhow::Result<Uuid> {
-    let feature = db.create_feature(
-        project_id,
-        CreateFeatureInput {
-            parent_id,
-            title: proposed.title.clone(),
-            details: proposed.details.clone(),
-            state: Some(FeatureState::Specified),
-            priority: Some(proposed.priority),
-        },
-    )?;
+) -> Uuid {
+    let id = Uuid::new_v4();
+    created_ids.push(id.to_string());
 
-    created_ids.push(feature.id.to_string());
+    inputs.push(CreateFeatureInput {
+        id: Some(id),
+        parent_id,
+        title: proposed.title.clone(),
+        details: proposed.details.clone(),
+        state: Some(FeatureState::Specified),
+        priority: Some(proposed.priority),
+    });
 
-    // Create children with this feature as parent
+    // Recursively flatten children with this feature's ID as parent
     for child in &proposed.children {
-        create_feature_recursive(db, project_id, Some(feature.id), child, created_ids)?;
+        flatten_feature_tree(Some(id), child, inputs, created_ids);
     }
 
-    Ok(feature.id)
+    id
 }

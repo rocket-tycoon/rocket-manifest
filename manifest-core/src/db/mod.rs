@@ -1,15 +1,60 @@
 mod schema;
 
+use std::fmt;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use rusqlite::Connection;
 use uuid::Uuid;
 
 use crate::models::*;
+
+/// Domain errors that can be meaningfully handled by callers.
+/// These are distinct from infrastructure errors (SQLite failures, etc.)
+/// which propagate as `anyhow::Error`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ManifestError {
+    /// Resource does not exist (project, feature, session, task)
+    NotFound(String),
+    /// Input validation failed (e.g., sessions only on leaf features)
+    Validation(String),
+    /// Operation not allowed in current state (e.g., session not active)
+    InvalidState(String),
+}
+
+impl ManifestError {
+    pub fn not_found(entity: &str) -> Self {
+        ManifestError::NotFound(format!("{} not found", entity))
+    }
+
+    pub fn validation(msg: impl Into<String>) -> Self {
+        ManifestError::Validation(msg.into())
+    }
+
+    pub fn invalid_state(msg: impl Into<String>) -> Self {
+        ManifestError::InvalidState(msg.into())
+    }
+
+    /// Returns true if this is a client error (4xx), false if server error (5xx)
+    pub fn is_client_error(&self) -> bool {
+        true // All ManifestError variants are client errors
+    }
+}
+
+impl fmt::Display for ManifestError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ManifestError::NotFound(msg) => write!(f, "{}", msg),
+            ManifestError::Validation(msg) => write!(f, "{}", msg),
+            ManifestError::InvalidState(msg) => write!(f, "{}", msg),
+        }
+    }
+}
+
+impl std::error::Error for ManifestError {}
 
 pub struct Database {
     conn: Arc<Mutex<Connection>>,
@@ -201,7 +246,7 @@ impl Database {
         input: AddDirectoryInput,
     ) -> Result<ProjectDirectory> {
         self.get_project(project_id)?
-            .ok_or_else(|| anyhow::anyhow!("Project not found"))?;
+            .ok_or_else(|| ManifestError::not_found("Project"))?;
 
         let conn = self.conn.lock().expect("database lock poisoned");
         let id = Uuid::new_v4();
@@ -293,15 +338,41 @@ impl Database {
     // Feature operations
     // ============================================================
 
-    pub fn get_all_features(&self) -> Result<Vec<Feature>> {
+    /// Get all features with optional SQL-based pagination.
+    pub fn get_all_features_paginated(
+        &self,
+        limit: Option<u32>,
+        offset: Option<u32>,
+    ) -> Result<Vec<Feature>> {
         let conn = self.conn.lock().expect("database lock poisoned");
-        let mut stmt = conn.prepare(
-            "SELECT id, project_id, parent_id, title, details, desired_details, state, priority, created_at, updated_at
-             FROM features ORDER BY priority, title",
-        )?;
 
+        let (sql, params): (String, Vec<Box<dyn rusqlite::ToSql>>) = match (limit, offset) {
+            (Some(lim), Some(off)) => (
+                "SELECT id, project_id, parent_id, title, details, desired_details, state, priority, created_at, updated_at
+                 FROM features ORDER BY priority, title LIMIT ? OFFSET ?".to_string(),
+                vec![Box::new(lim) as Box<dyn rusqlite::ToSql>, Box::new(off)],
+            ),
+            (Some(lim), None) => (
+                "SELECT id, project_id, parent_id, title, details, desired_details, state, priority, created_at, updated_at
+                 FROM features ORDER BY priority, title LIMIT ?".to_string(),
+                vec![Box::new(lim) as Box<dyn rusqlite::ToSql>],
+            ),
+            (None, Some(off)) => (
+                "SELECT id, project_id, parent_id, title, details, desired_details, state, priority, created_at, updated_at
+                 FROM features ORDER BY priority, title LIMIT -1 OFFSET ?".to_string(),
+                vec![Box::new(off) as Box<dyn rusqlite::ToSql>],
+            ),
+            (None, None) => (
+                "SELECT id, project_id, parent_id, title, details, desired_details, state, priority, created_at, updated_at
+                 FROM features ORDER BY priority, title".to_string(),
+                vec![],
+            ),
+        };
+
+        let mut stmt = conn.prepare(&sql)?;
+        let params_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
         let features = stmt
-            .query_map([], |row| {
+            .query_map(params_refs.as_slice(), |row| {
                 Ok(Feature {
                     id: parse_uuid(row.get::<_, String>(0)?),
                     project_id: parse_uuid(row.get::<_, String>(1)?),
@@ -321,15 +392,58 @@ impl Database {
         Ok(features)
     }
 
-    pub fn get_features_by_project(&self, project_id: Uuid) -> Result<Vec<Feature>> {
-        let conn = self.conn.lock().expect("database lock poisoned");
-        let mut stmt = conn.prepare(
-            "SELECT id, project_id, parent_id, title, details, desired_details, state, priority, created_at, updated_at
-             FROM features WHERE project_id = ? ORDER BY priority, title",
-        )?;
+    /// Get all features (unpaginated, for backwards compatibility).
+    pub fn get_all_features(&self) -> Result<Vec<Feature>> {
+        self.get_all_features_paginated(None, None)
+    }
 
+    /// Get features by project with optional SQL-based pagination.
+    pub fn get_features_by_project_paginated(
+        &self,
+        project_id: Uuid,
+        limit: Option<u32>,
+        offset: Option<u32>,
+    ) -> Result<Vec<Feature>> {
+        let conn = self.conn.lock().expect("database lock poisoned");
+        let project_id_str = project_id.to_string();
+
+        let (sql, params): (String, Vec<Box<dyn rusqlite::ToSql>>) = match (limit, offset) {
+            (Some(lim), Some(off)) => (
+                "SELECT id, project_id, parent_id, title, details, desired_details, state, priority, created_at, updated_at
+                 FROM features WHERE project_id = ? ORDER BY priority, title LIMIT ? OFFSET ?".to_string(),
+                vec![
+                    Box::new(project_id_str.clone()) as Box<dyn rusqlite::ToSql>,
+                    Box::new(lim),
+                    Box::new(off),
+                ],
+            ),
+            (Some(lim), None) => (
+                "SELECT id, project_id, parent_id, title, details, desired_details, state, priority, created_at, updated_at
+                 FROM features WHERE project_id = ? ORDER BY priority, title LIMIT ?".to_string(),
+                vec![
+                    Box::new(project_id_str.clone()) as Box<dyn rusqlite::ToSql>,
+                    Box::new(lim),
+                ],
+            ),
+            (None, Some(off)) => (
+                "SELECT id, project_id, parent_id, title, details, desired_details, state, priority, created_at, updated_at
+                 FROM features WHERE project_id = ? ORDER BY priority, title LIMIT -1 OFFSET ?".to_string(),
+                vec![
+                    Box::new(project_id_str.clone()) as Box<dyn rusqlite::ToSql>,
+                    Box::new(off),
+                ],
+            ),
+            (None, None) => (
+                "SELECT id, project_id, parent_id, title, details, desired_details, state, priority, created_at, updated_at
+                 FROM features WHERE project_id = ? ORDER BY priority, title".to_string(),
+                vec![Box::new(project_id_str.clone()) as Box<dyn rusqlite::ToSql>],
+            ),
+        };
+
+        let mut stmt = conn.prepare(&sql)?;
+        let params_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
         let features = stmt
-            .query_map([project_id.to_string()], |row| {
+            .query_map(params_refs.as_slice(), |row| {
                 Ok(Feature {
                     id: parse_uuid(row.get::<_, String>(0)?),
                     project_id: parse_uuid(row.get::<_, String>(1)?),
@@ -347,6 +461,11 @@ impl Database {
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(features)
+    }
+
+    /// Get features by project (unpaginated, for backwards compatibility).
+    pub fn get_features_by_project(&self, project_id: Uuid) -> Result<Vec<Feature>> {
+        self.get_features_by_project_paginated(project_id, None, None)
     }
 
     pub fn get_feature(&self, id: Uuid) -> Result<Option<Feature>> {
@@ -396,10 +515,10 @@ impl Database {
     pub fn create_feature(&self, project_id: Uuid, input: CreateFeatureInput) -> Result<Feature> {
         // Verify project exists
         self.get_project(project_id)?
-            .ok_or_else(|| anyhow::anyhow!("Project not found"))?;
+            .ok_or_else(|| ManifestError::not_found("Project"))?;
 
         let conn = self.conn.lock().expect("database lock poisoned");
-        let id = Uuid::new_v4();
+        let id = input.id.unwrap_or_else(Uuid::new_v4);
         let now = Utc::now();
         let state = input.state.unwrap_or(FeatureState::Proposed);
         let priority = input.priority.unwrap_or(0);
@@ -432,6 +551,62 @@ impl Database {
             created_at: now,
             updated_at: now,
         })
+    }
+
+    /// Create multiple features in a single transaction.
+    /// All features are created atomically - if any fails, all are rolled back.
+    pub fn create_features_bulk(
+        &self,
+        project_id: Uuid,
+        inputs: Vec<CreateFeatureInput>,
+    ) -> Result<Vec<Feature>> {
+        // Verify project exists
+        self.get_project(project_id)?
+            .ok_or_else(|| ManifestError::not_found("Project"))?;
+
+        let mut conn = self.conn.lock().expect("database lock poisoned");
+        let tx = conn.transaction()?;
+        let now = Utc::now();
+
+        let mut features = Vec::with_capacity(inputs.len());
+
+        for input in inputs {
+            let id = input.id.unwrap_or_else(Uuid::new_v4);
+            let state = input.state.unwrap_or(FeatureState::Proposed);
+            let priority = input.priority.unwrap_or(0);
+
+            tx.execute(
+                "INSERT INTO features (id, project_id, parent_id, title, details, state, priority, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    id.to_string(),
+                    project_id.to_string(),
+                    input.parent_id.map(|u| u.to_string()),
+                    &input.title,
+                    &input.details,
+                    state.as_str(),
+                    priority,
+                    now.to_rfc3339(),
+                    now.to_rfc3339(),
+                ),
+            )?;
+
+            features.push(Feature {
+                id,
+                project_id,
+                parent_id: input.parent_id,
+                title: input.title,
+                details: input.details,
+                desired_details: None,
+                state,
+                priority,
+                created_at: now,
+                updated_at: now,
+            });
+        }
+
+        tx.commit()?;
+        Ok(features)
     }
 
     pub fn update_feature(&self, id: Uuid, input: UpdateFeatureInput) -> Result<Option<Feature>> {
@@ -705,18 +880,22 @@ impl Database {
 
     pub fn create_session(&self, input: CreateSessionInput) -> Result<SessionResponse> {
         self.get_feature(input.feature_id)?
-            .ok_or_else(|| anyhow::anyhow!("Feature not found"))?;
+            .ok_or_else(|| ManifestError::not_found("Feature"))?;
 
         // Sessions can only be created on leaf features (no children)
         if !self.is_leaf(input.feature_id)? {
-            anyhow::bail!("Sessions can only be created on leaf features");
+            return Err(
+                ManifestError::validation("Sessions can only be created on leaf features").into(),
+            );
         }
 
-        let conn = self.conn.lock().expect("database lock poisoned");
+        let mut conn = self.conn.lock().expect("database lock poisoned");
+        let tx = conn.transaction()?;
+
         let session_id = Uuid::new_v4();
         let now = Utc::now();
 
-        conn.execute(
+        tx.execute(
             "INSERT INTO sessions (id, feature_id, goal, status, created_at)
              VALUES (?, ?, ?, 'active', ?)",
             (
@@ -730,18 +909,18 @@ impl Database {
         let session = Session {
             id: session_id,
             feature_id: input.feature_id,
-            goal: input.goal,
+            goal: input.goal.clone(),
             status: SessionStatus::Active,
             created_at: now,
             completed_at: None,
         };
 
-        // Create tasks
+        // Create tasks within the same transaction
         let mut tasks = Vec::new();
         for task_input in input.tasks {
             let task_id = Uuid::new_v4();
 
-            conn.execute(
+            tx.execute(
                 "INSERT INTO tasks (id, session_id, parent_id, title, scope, status, agent_type, created_at)
                  VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)",
                 (
@@ -769,6 +948,7 @@ impl Database {
             });
         }
 
+        tx.commit()?;
         Ok(SessionResponse { session, tasks })
     }
 
@@ -780,7 +960,7 @@ impl Database {
 
         let feature = self
             .get_feature(session.feature_id)?
-            .ok_or_else(|| anyhow::anyhow!("Feature not found"))?;
+            .ok_or_else(|| ManifestError::not_found("Feature"))?;
 
         let tasks = self.get_tasks_by_session(id)?;
 
@@ -805,26 +985,49 @@ impl Database {
         };
 
         if session.status != SessionStatus::Active {
-            anyhow::bail!("Session is not active");
+            return Err(ManifestError::invalid_state("Session is not active").into());
         }
 
-        // Create history entry with structured details
-        let history_entry = self.create_history_entry(CreateHistoryInput {
+        let mut conn = self.conn.lock().expect("database lock poisoned");
+        let tx = conn.transaction()?;
+        let now = Utc::now();
+
+        // Create history entry with structured details (inlined for transaction)
+        let history_id = Uuid::new_v4();
+        let history_details = HistoryDetails {
+            summary: input.summary.clone(),
+            commits: input.commits.clone(),
+        };
+        let details_json = serde_json::to_string(&history_details)?;
+
+        tx.execute(
+            "INSERT INTO feature_history (id, feature_id, session_id, summary, files_changed, author, details, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                history_id.to_string(),
+                session.feature_id.to_string(),
+                Some(id.to_string()),
+                &input.summary,
+                "[]", // deprecated
+                "",   // deprecated
+                &details_json,
+                now.to_rfc3339(),
+            ),
+        )?;
+
+        let history_entry = FeatureHistory {
+            id: history_id,
             feature_id: session.feature_id,
             session_id: Some(id),
-            details: HistoryDetails {
-                summary: input.summary,
-                commits: input.commits,
-            },
-        })?;
+            details: history_details,
+            created_at: now,
+        };
 
         // Delete tasks
-        let conn = self.conn.lock().expect("database lock poisoned");
-        conn.execute("DELETE FROM tasks WHERE session_id = ?", [id.to_string()])?;
+        tx.execute("DELETE FROM tasks WHERE session_id = ?", [id.to_string()])?;
 
         // Update session status
-        let now = Utc::now();
-        conn.execute(
+        tx.execute(
             "UPDATE sessions SET status = 'completed', completed_at = ? WHERE id = ?",
             (now.to_rfc3339(), id.to_string()),
         )?;
@@ -834,7 +1037,7 @@ impl Database {
         if let Some(state) = input.feature_state {
             if state == FeatureState::Implemented {
                 // Promote desired_details to details and clear desired_details
-                conn.execute(
+                tx.execute(
                     "UPDATE features SET
                         state = ?,
                         details = COALESCE(desired_details, details),
@@ -848,7 +1051,7 @@ impl Database {
                     ),
                 )?;
             } else {
-                conn.execute(
+                tx.execute(
                     "UPDATE features SET state = ?, updated_at = ? WHERE id = ?",
                     (
                         state.as_str(),
@@ -858,6 +1061,8 @@ impl Database {
                 )?;
             }
         }
+
+        tx.commit()?;
 
         let completed_session = Session {
             id: session.id,
@@ -968,10 +1173,12 @@ impl Database {
         // Verify session exists and is active
         let session = self
             .get_session(session_id)?
-            .ok_or_else(|| anyhow::anyhow!("Session not found"))?;
+            .ok_or_else(|| ManifestError::not_found("Session"))?;
 
         if session.status != SessionStatus::Active {
-            anyhow::bail!("Cannot add tasks to a completed session");
+            return Err(
+                ManifestError::invalid_state("Cannot add tasks to a completed session").into(),
+            );
         }
 
         let conn = self.conn.lock().expect("database lock poisoned");
@@ -1110,11 +1317,16 @@ impl Clone for Database {
 }
 
 fn parse_uuid(s: String) -> Uuid {
-    Uuid::parse_str(&s).unwrap_or_else(|_| Uuid::nil())
+    Uuid::parse_str(&s).unwrap_or_else(|_| panic!("Invalid UUID stored in database: {}", s))
 }
 
-fn parse_datetime(s: String) -> chrono::DateTime<Utc> {
+fn parse_datetime(s: String) -> DateTime<Utc> {
+    // Try RFC3339 first (e.g., 2026-01-11T18:51:25Z)
     chrono::DateTime::parse_from_rfc3339(&s)
         .map(|dt| dt.with_timezone(&Utc))
-        .unwrap_or_else(|_| Utc::now())
+        .or_else(|_| {
+            // Fall back to SQLite format (e.g., 2026-01-11 18:51:25)
+            chrono::NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S").map(|dt| dt.and_utc())
+        })
+        .unwrap_or_else(|_| panic!("Invalid timestamp stored in database: {}", s))
 }
