@@ -11,6 +11,10 @@ license = "MIT"
 # GPUI from Zed (not published to crates.io)
 gpui = { path = "../../zed/crates/gpui" }
 
+# UI component library (fork with soft wrap performance fix)
+gpui-component = { git = "https://github.com/rocket-tycoon/gpui-component" }
+gpui-component-assets = { git = "https://github.com/rocket-tycoon/gpui-component" }
+
 # Terminal emulation
 alacritty_terminal = "0.25.1-rc1"
 
@@ -43,3 +47,11 @@ feature_editor = { path = "feature_editor" }
 
 # Core library (direct database access)
 manifest-core = { path = "../manifest-core" }
+
+[patch.crates-io]
+# Override crates.io gpui with our local Zed version
+gpui = { path = "../../zed/crates/gpui" }
+
+[patch."https://github.com/zed-industries/zed"]
+# Override gpui-component's git gpui dependency with our local Zed version
+gpui = { path = "../../zed/crates/gpui" }

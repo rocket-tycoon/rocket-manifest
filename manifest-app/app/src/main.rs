@@ -3,24 +3,28 @@
 //! A GPUI application with a feature explorer panel, feature editor, and terminal.
 
 mod active_context;
+mod config;
 mod context_file;
 
-use std::cell::Cell;
-use std::sync::Arc;
-
 use active_context::ActiveFeatureContext;
+use config::AppConfig;
 
 use feature_editor::{Event as EditorEvent, FeatureEditor};
-use feature_panel::{Event as PanelEvent, FeaturePanel};
-use gpui::{
-    actions, div, point, prelude::*, px, relative, size, App, Application, Bounds, Context,
-    CursorStyle, Entity, Focusable, InteractiveElement, KeyBinding, Menu, MenuItem, MouseButton,
-    MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, PathPromptOptions, Render, Styled,
-    TitlebarOptions, Window, WindowBounds, WindowOptions,
+use feature_panel::{
+    DEFAULT_PANEL_WIDTH, Event as PanelEvent, FeaturePanel, MAX_PANEL_WIDTH, MIN_PANEL_WIDTH,
 };
-use std::path::PathBuf;
+use gpui::{
+    App, Application, Bounds, Context, Entity, Focusable, Hsla, KeyBinding, Menu, MenuItem,
+    ParentElement, PathPromptOptions, Render, Styled, TitlebarOptions, Window, WindowBounds,
+    WindowOptions, actions, div, point, prelude::*, px, size,
+};
+use gpui_component::Root;
+use gpui_component::highlighter::{HighlightTheme, HighlightThemeStyle};
+use gpui_component::resizable::{h_resizable, resizable_panel, v_resizable};
+use gpui_component::theme::{Theme, ThemeMode};
 use manifest_core::db::Database;
-use parking_lot::Mutex;
+use std::path::PathBuf;
+use std::sync::Arc;
 use terminal::mappings::colors::TerminalColors;
 use terminal_view::TerminalView;
 use uuid::Uuid;
@@ -62,14 +66,20 @@ mod convert {
 
 actions!(app, [Quit, Open, OpenRecent, Save]);
 
-/// Load embedded IBM Plex Sans fonts into the text system.
+/// Load embedded fonts into the text system.
 fn load_embedded_fonts(cx: &App) {
     use std::borrow::Cow;
 
     let fonts: Vec<Cow<'static, [u8]>> = vec![
+        // IBM Plex Sans (UI font)
         Cow::Borrowed(include_bytes!("../fonts/IBMPlexSans-Regular.ttf")),
         Cow::Borrowed(include_bytes!("../fonts/IBMPlexSans-Medium.ttf")),
         Cow::Borrowed(include_bytes!("../fonts/IBMPlexSans-SemiBold.ttf")),
+        // Bitstream Vera Sans Mono (terminal/editor font)
+        Cow::Borrowed(include_bytes!("../fonts/VeraMono.ttf")),
+        Cow::Borrowed(include_bytes!("../fonts/VeraMoBd.ttf")),
+        Cow::Borrowed(include_bytes!("../fonts/VeraMoIt.ttf")),
+        Cow::Borrowed(include_bytes!("../fonts/VeraMoBI.ttf")),
     ];
 
     if let Err(e) = cx.text_system().add_fonts(fonts) {
@@ -77,35 +87,181 @@ fn load_embedded_fonts(cx: &App) {
     }
 }
 
-/// Pane colors (Pigs in Space theme).
-mod colors {
-    use gpui::Hsla;
+/// Apply "Pigs in Space" theme colors to gpui-component.
+fn apply_pigs_in_space_theme(cx: &mut App) {
+    let theme = Theme::global_mut(cx);
 
-    pub fn divider() -> Hsla {
-        Hsla {
-            h: 210.0 / 360.0,
-            s: 0.10,
-            l: 0.25,
-            a: 1.0,
-        }
-    }
+    // Editor font
+    theme.mono_font_family = "Bitstream Vera Sans Mono".into();
 
-    pub fn divider_hover() -> Hsla {
-        Hsla {
-            h: 220.0 / 360.0,
-            s: 1.0,
-            l: 0.75,
-            a: 0.5,
-        }
-    }
+    // Background colors
+    theme.background = Hsla {
+        h: 210.0 / 360.0,
+        s: 0.13,
+        l: 0.15,
+        a: 1.0,
+    }; // #21262c
+
+    // Text colors
+    theme.foreground = Hsla {
+        h: 210.0 / 360.0,
+        s: 0.45,
+        l: 0.84,
+        a: 1.0,
+    }; // #c2d6ea
+    theme.muted_foreground = Hsla {
+        h: 215.0 / 360.0,
+        s: 0.20,
+        l: 0.55,
+        a: 1.0,
+    }; // #78859b
+
+    // Cursor/caret color (bright for visibility on dark background)
+    theme.caret = Hsla {
+        h: 210.0 / 360.0,
+        s: 0.45,
+        l: 0.84,
+        a: 1.0,
+    }; // same as foreground
+
+    // Border color (for dividers)
+    theme.border = Hsla {
+        h: 210.0 / 360.0,
+        s: 0.10,
+        l: 0.28,
+        a: 1.0,
+    }; // ~#3a4149
+
+    // Tab bar colors
+    theme.tab_bar = Hsla {
+        h: 212.0 / 360.0,
+        s: 0.15,
+        l: 0.10,
+        a: 1.0,
+    }; // #15191e
+    theme.tab = Hsla {
+        h: 212.0 / 360.0,
+        s: 0.15,
+        l: 0.10,
+        a: 1.0,
+    }; // same as tab bar
+    theme.tab_active = Hsla {
+        h: 210.0 / 360.0,
+        s: 0.13,
+        l: 0.15,
+        a: 1.0,
+    }; // #21262c
+    theme.tab_foreground = Hsla {
+        h: 215.0 / 360.0,
+        s: 0.20,
+        l: 0.55,
+        a: 1.0,
+    }; // muted
+    theme.tab_active_foreground = Hsla {
+        h: 210.0 / 360.0,
+        s: 0.45,
+        l: 0.84,
+        a: 1.0,
+    }; // bright
+
+    // List/hover colors (used for tab hover, tree items, etc.)
+    // From Pigs in Space: list.hoverBackground = #30353d, list.activeSelectionBackground = #373f47
+    theme.list_hover = Hsla {
+        h: 215.0 / 360.0,
+        s: 0.12,
+        l: 0.21,
+        a: 1.0,
+    }; // #30353d
+    theme.list_active = Hsla {
+        h: 210.0 / 360.0,
+        s: 0.12,
+        l: 0.25,
+        a: 1.0,
+    }; // #373f47
+    theme.list_active_border = Hsla {
+        h: 210.0 / 360.0,
+        s: 0.10,
+        l: 0.20,
+        a: 0.0,
+    }; // transparent
+
+    // Secondary colors (used for ghost buttons)
+    theme.secondary = Hsla {
+        h: 212.0 / 360.0,
+        s: 0.15,
+        l: 0.15,
+        a: 1.0,
+    };
+    theme.secondary_hover = Hsla {
+        h: 212.0 / 360.0,
+        s: 0.12,
+        l: 0.22,
+        a: 1.0,
+    };
+    theme.secondary_foreground = Hsla {
+        h: 215.0 / 360.0,
+        s: 0.20,
+        l: 0.55,
+        a: 1.0,
+    };
+
+    // Accent colors
+    theme.accent = Hsla {
+        h: 212.0 / 360.0,
+        s: 0.12,
+        l: 0.22,
+        a: 1.0,
+    };
+    theme.accent_foreground = Hsla {
+        h: 210.0 / 360.0,
+        s: 0.45,
+        l: 0.84,
+        a: 1.0,
+    };
+
+    // Editor/highlight theme colors (for Input component with line numbers)
+    // From Pigs in Space Zed theme:
+    // editor.background: #21262c, editor.foreground: #a0b0c1
+    // editor.active_line.background: #2c3137
+    // editor.line_number: #424b55, editor.active_line_number: #a0b0c1
+    theme.highlight_theme = Arc::new(HighlightTheme {
+        name: "Pigs in Space".into(),
+        appearance: ThemeMode::Dark,
+        style: HighlightThemeStyle {
+            editor_background: Some(Hsla {
+                h: 210.0 / 360.0,
+                s: 0.13,
+                l: 0.15,
+                a: 1.0,
+            }), // #21262c
+            editor_foreground: Some(Hsla {
+                h: 210.0 / 360.0,
+                s: 0.18,
+                l: 0.66,
+                a: 1.0,
+            }), // #a0b0c1
+            editor_active_line: Some(Hsla {
+                h: 212.0 / 360.0,
+                s: 0.10,
+                l: 0.19,
+                a: 1.0,
+            }), // #2c3137
+            editor_line_number: Some(Hsla {
+                h: 212.0 / 360.0,
+                s: 0.12,
+                l: 0.30,
+                a: 1.0,
+            }), // #424b55
+            editor_active_line_number: Some(Hsla {
+                h: 210.0 / 360.0,
+                s: 0.18,
+                l: 0.66,
+                a: 1.0,
+            }), // #a0b0c1
+            ..Default::default()
+        },
+    });
 }
-
-/// Minimum pane height in pixels.
-const MIN_PANE_HEIGHT: f32 = 100.0;
-/// Divider hit area size.
-const DIVIDER_HITBOX_SIZE: f32 = 8.0;
-/// Visual divider thickness.
-const DIVIDER_SIZE: f32 = 1.0;
 
 /// Set up the application menus.
 fn set_menus(cx: &mut App) {
@@ -126,26 +282,30 @@ fn set_menus(cx: &mut App) {
     ]);
 }
 
+/// Result of fetching features: features and the directory name to display.
+struct FetchResult {
+    features: Vec<manifest_client::Feature>,
+    directory_name: Option<String>,
+}
+
 /// Root application view with feature panel, editor, and terminal.
-struct ManifestApp {
+pub struct ManifestApp {
     feature_panel: Entity<FeaturePanel>,
     feature_editor: Entity<FeatureEditor>,
     terminal_view: Entity<TerminalView>,
-    /// Current project directory path.
+    config: AppConfig,
     current_project_path: Option<PathBuf>,
-    /// Flex values for editor/terminal split [editor_flex, terminal_flex].
-    pane_flexes: Arc<Mutex<Vec<f32>>>,
-    /// Whether the user is currently dragging the divider.
-    dragging_divider: Arc<Cell<bool>>,
-    /// Y position when drag started (for computing delta).
-    drag_start_y: Arc<Cell<f32>>,
-    /// Total height of the split pane area (updated during render).
-    split_area_height: Arc<Cell<f32>>,
 }
 
 impl ManifestApp {
-    fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let feature_panel = cx.new(|cx| FeaturePanel::new(cx));
+    pub fn new(config: AppConfig, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let feature_panel = cx.new(|cx| {
+            let mut panel = FeaturePanel::new(cx);
+            if let Some(width) = config.feature_panel_width {
+                panel.set_width(width, cx);
+            }
+            panel
+        });
         let feature_editor = cx.new(|cx| FeatureEditor::new(cx));
         let terminal_view = cx.new(|cx| TerminalView::new(window, cx));
 
@@ -154,9 +314,8 @@ impl ManifestApp {
         cx.subscribe(
             &feature_panel,
             move |_this, _panel, event: &PanelEvent, cx| {
-                if let PanelEvent::FeatureSelected(feature_id) = event {
-                    Self::on_feature_selected(*feature_id, &feature_editor_clone, cx);
-                }
+                let PanelEvent::FeatureSelected(feature_id) = event;
+                Self::on_feature_selected(*feature_id, &feature_editor_clone, cx);
             },
         )
         .detach();
@@ -164,7 +323,7 @@ impl ManifestApp {
         // Subscribe to editor events for dirty close handling
         cx.subscribe(
             &feature_editor,
-            |_this, _editor, event: &EditorEvent, cx| {
+            |_this, _editor, event: &EditorEvent, _cx| {
                 match event {
                     EditorEvent::FeatureSaved(id) => {
                         eprintln!("Feature {} saved", id);
@@ -194,10 +353,13 @@ impl ManifestApp {
                 .await;
 
             match result {
-                Ok(features) => {
+                Ok(FetchResult {
+                    features,
+                    directory_name,
+                }) => {
                     eprintln!("Loaded {} features", features.len());
                     cx.update_entity(&feature_panel_clone, |panel, cx| {
-                        panel.set_features(features, cx);
+                        panel.set_features(features, directory_name, cx);
                     });
                 }
                 Err(e) => {
@@ -210,15 +372,12 @@ impl ManifestApp {
         })
         .detach();
 
-        ManifestApp {
+        Self {
             feature_panel,
             feature_editor,
             terminal_view,
+            config,
             current_project_path: None,
-            pane_flexes: Arc::new(Mutex::new(vec![1.0, 1.0])), // Equal split
-            dragging_divider: Arc::new(Cell::new(false)),
-            drag_start_y: Arc::new(Cell::new(0.0)),
-            split_area_height: Arc::new(Cell::new(600.0)),
         }
     }
 
@@ -254,9 +413,9 @@ impl ManifestApp {
                         );
                     });
 
-                    // Update editor
+                    // Update editor - use update_entity which works without window handle
                     cx.update_entity(&editor_clone, |editor, cx| {
-                        editor.open_feature(feature.id, feature.title, feature.details, cx);
+                        editor.load_feature(feature.id, feature.title, feature.details, cx);
                     });
                 }
                 Ok(None) => {
@@ -271,7 +430,7 @@ impl ManifestApp {
     }
 
     /// Fetch features for a specific directory path (blocking, runs on background thread).
-    fn fetch_features_for_path(path: &str) -> Result<Vec<manifest_client::Feature>, String> {
+    fn fetch_features_for_path(path: &str) -> Result<FetchResult, String> {
         let db = Database::open_default().map_err(|e| format!("Failed to open database: {}", e))?;
         db.migrate()
             .map_err(|e| format!("Failed to migrate database: {}", e))?;
@@ -293,7 +452,17 @@ impl ManifestApp {
                         .into_iter()
                         .map(convert::tree_node_to_feature)
                         .collect();
-                    return Ok(converted);
+
+                    // Extract directory name from path
+                    let directory_name = std::path::Path::new(path)
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .map(|s| s.to_string());
+
+                    return Ok(FetchResult {
+                        features: converted,
+                        directory_name,
+                    });
                 }
                 Err(e) => {
                     eprintln!("Error fetching features: {}", e);
@@ -305,7 +474,7 @@ impl ManifestApp {
     }
 
     /// Fetch features, trying CWD first then falling back to any project with features.
-    fn fetch_features() -> Result<Vec<manifest_client::Feature>, String> {
+    fn fetch_features() -> Result<FetchResult, String> {
         let db = Database::open_default().map_err(|e| format!("Failed to open database: {}", e))?;
         db.migrate()
             .map_err(|e| format!("Failed to migrate database: {}", e))?;
@@ -329,7 +498,17 @@ impl ManifestApp {
                                 .into_iter()
                                 .map(convert::tree_node_to_feature)
                                 .collect();
-                            return Ok(converted);
+
+                            // Extract directory name from CWD
+                            let directory_name = cwd
+                                .file_name()
+                                .and_then(|n| n.to_str())
+                                .map(|s| s.to_string());
+
+                            return Ok(FetchResult {
+                                features: converted,
+                                directory_name,
+                            });
                         }
                         Err(e) => {
                             eprintln!("Error fetching features: {}", e);
@@ -339,7 +518,7 @@ impl ManifestApp {
             }
         }
 
-        // Fallback: find first project with features
+        // Fallback: find first project with features (no directory context)
         let projects = db
             .get_all_projects()
             .map_err(|e| format!("Failed to fetch projects: {}", e))?;
@@ -356,7 +535,10 @@ impl ManifestApp {
                         .into_iter()
                         .map(convert::tree_node_to_feature)
                         .collect();
-                    return Ok(converted);
+                    return Ok(FetchResult {
+                        features: converted,
+                        directory_name: None, // No directory context in fallback
+                    });
                 }
                 Ok(_) => continue,
                 Err(e) => {
@@ -382,10 +564,13 @@ impl ManifestApp {
                 .await;
 
             match result {
-                Ok(features) => {
+                Ok(FetchResult {
+                    features,
+                    directory_name,
+                }) => {
                     eprintln!("Loaded {} features", features.len());
                     cx.update_entity(&feature_panel, |panel, cx| {
-                        panel.set_features(features, cx);
+                        panel.set_features(features, directory_name, cx);
                     });
                 }
                 Err(e) => {
@@ -398,238 +583,129 @@ impl ManifestApp {
         })
         .detach();
     }
-
-    /// Handle mouse down on divider.
-    fn on_divider_mouse_down(
-        &mut self,
-        event: &MouseDownEvent,
-        _window: &mut Window,
-        _cx: &mut Context<Self>,
-    ) {
-        if event.button == MouseButton::Left {
-            self.dragging_divider.set(true);
-            // Convert Pixels to f32 using division
-            self.drag_start_y.set(event.position.y / px(1.0));
-
-            // Double-click resets to equal split
-            if event.click_count >= 2 {
-                let mut flexes = self.pane_flexes.lock();
-                *flexes = vec![1.0, 1.0];
-            }
-        }
-    }
-
-    /// Handle mouse up (stop dragging).
-    fn on_divider_mouse_up(
-        &mut self,
-        _event: &MouseUpEvent,
-        _window: &mut Window,
-        _cx: &mut Context<Self>,
-    ) {
-        self.dragging_divider.set(false);
-    }
-
-    /// Handle mouse move while dragging.
-    fn on_divider_mouse_move(
-        &mut self,
-        event: &MouseMoveEvent,
-        _window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        if !self.dragging_divider.get() {
-            return;
-        }
-
-        // Convert Pixels to f32 using division
-        let current_y = event.position.y / px(1.0);
-        let delta_y = current_y - self.drag_start_y.get();
-        let total_height = self.split_area_height.get();
-
-        if total_height <= 0.0 {
-            return;
-        }
-
-        // Convert pixel delta to flex delta
-        let flex_delta = delta_y / total_height;
-
-        let mut flexes = self.pane_flexes.lock();
-        let total_flex: f32 = flexes.iter().sum();
-
-        // Calculate new flex values
-        let new_editor_flex = (flexes[0] + flex_delta * total_flex).max(0.1);
-        let new_terminal_flex = (flexes[1] - flex_delta * total_flex).max(0.1);
-
-        // Check minimum heights
-        let editor_height =
-            (new_editor_flex / (new_editor_flex + new_terminal_flex)) * total_height;
-        let terminal_height =
-            (new_terminal_flex / (new_editor_flex + new_terminal_flex)) * total_height;
-
-        if editor_height >= MIN_PANE_HEIGHT && terminal_height >= MIN_PANE_HEIGHT {
-            flexes[0] = new_editor_flex;
-            flexes[1] = new_terminal_flex;
-            self.drag_start_y.set(current_y);
-            cx.notify();
-        }
-    }
 }
 
 impl Render for ManifestApp {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let bg_color: gpui::Hsla = TerminalColors::background().into();
-
-        // Get current flex values as ratios (0.0-1.0)
-        let flexes = self.pane_flexes.lock().clone();
-        let total_flex: f32 = flexes.iter().sum();
-        let editor_ratio = flexes[0] / total_flex;
-        let terminal_ratio = flexes[1] / total_flex;
-
-        let is_dragging = self.dragging_divider.get();
-        let divider_color = if is_dragging {
-            colors::divider_hover()
-        } else {
-            colors::divider()
-        };
 
         div()
             .id("manifest-app")
             .size_full()
             .bg(bg_color)
-            .flex()
-            .flex_row()
-            // Left: Feature panel (fixed 250px)
-            .child(self.feature_panel.clone())
-            // Right: Split pane area
             .child(
-                div()
-                    .id("split-pane-area")
-                    .flex_1()
-                    .h_full()
-                    .flex()
-                    .flex_col()
-                    .on_mouse_up(MouseButton::Left, cx.listener(Self::on_divider_mouse_up))
-                    .on_mouse_up_out(MouseButton::Left, cx.listener(Self::on_divider_mouse_up))
-                    .on_mouse_move(cx.listener(Self::on_divider_mouse_move))
-                    // Top: Feature editor
+                // Horizontal split: feature panel | editor+terminal
+                h_resizable("main-layout")
                     .child(
-                        div()
-                            .id("editor-pane")
-                            .flex_grow()
-                            .flex_shrink()
-                            .flex_basis(relative(editor_ratio))
-                            .min_h(px(MIN_PANE_HEIGHT))
-                            .w_full()
-                            .child(self.feature_editor.clone()),
+                        resizable_panel()
+                            .size(px(self
+                                .config
+                                .feature_panel_width
+                                .unwrap_or(DEFAULT_PANEL_WIDTH)))
+                            .size_range(px(MIN_PANEL_WIDTH)..px(MAX_PANEL_WIDTH))
+                            .child(self.feature_panel.clone()),
                     )
-                    // Divider
                     .child(
-                        div()
-                            .id("pane-divider")
-                            .h(px(DIVIDER_HITBOX_SIZE))
-                            .w_full()
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .cursor(CursorStyle::ResizeRow)
-                            .on_mouse_down(
-                                MouseButton::Left,
-                                cx.listener(Self::on_divider_mouse_down),
-                            )
-                            .child(div().h(px(DIVIDER_SIZE)).w_full().bg(divider_color)),
-                    )
-                    // Bottom: Terminal
-                    .child(
-                        div()
-                            .id("terminal-pane")
-                            .flex_grow()
-                            .flex_shrink()
-                            .flex_basis(relative(terminal_ratio))
-                            .min_h(px(MIN_PANE_HEIGHT))
-                            .w_full()
-                            .child(self.terminal_view.clone()),
+                        // Vertical split: editor | terminal
+                        v_resizable("editor-terminal")
+                            .child(resizable_panel().child(self.feature_editor.clone()))
+                            .child(resizable_panel().child(self.terminal_view.clone())),
                     ),
             )
+            // Render gpui-component overlay layers (dialogs, sheets, notifications)
+            .children(Root::render_dialog_layer(window, cx))
+            .children(Root::render_sheet_layer(window, cx))
+            .children(Root::render_notification_layer(window, cx))
     }
 }
 
 fn main() {
-    Application::new().run(|cx: &mut App| {
-        // Load embedded fonts first
-        load_embedded_fonts(cx);
+    Application::new()
+        .with_assets(gpui_component_assets::Assets)
+        .run(|cx: &mut App| {
+            // Load embedded fonts first
+            load_embedded_fonts(cx);
 
-        // Initialize global active feature context
-        cx.set_global(ActiveFeatureContext::default());
+            // Initialize gpui-component library (must be called before using any components)
+            gpui_component::init(cx);
 
-        // Set up application menus
-        set_menus(cx);
+            // Apply "Pigs in Space" theme colors
+            apply_pigs_in_space_theme(cx);
 
-        // Bind global keys
-        cx.bind_keys([
-            KeyBinding::new("cmd-q", Quit, None),
-            KeyBinding::new("cmd-o", Open, None),
-        ]);
+            // Initialize global active feature context
+            cx.set_global(ActiveFeatureContext::default());
 
-        // Register feature editor key bindings
-        feature_editor::register_bindings(cx);
+            // Set up application menus
+            set_menus(cx);
 
-        // Open the main window
-        let window_options = WindowOptions {
-            window_bounds: Some(WindowBounds::Windowed(Bounds {
-                origin: point(px(100.0), px(100.0)),
-                size: size(px(1200.0), px(800.0)),
-            })),
-            titlebar: Some(TitlebarOptions {
-                title: Some("Manifest".into()),
-                appears_transparent: false,
+            // Bind global keys
+            cx.bind_keys([
+                KeyBinding::new("cmd-q", Quit, None),
+                KeyBinding::new("cmd-o", Open, None),
+            ]);
+
+            // Register feature editor key bindings
+            feature_editor::register_bindings(cx);
+
+            // Register feature panel key bindings
+            feature_panel::register_bindings(cx);
+
+            let config = AppConfig::load();
+            let window_size = size(
+                px(config.window_width.unwrap_or(1200.0)),
+                px(config.window_height.unwrap_or(800.0)),
+            );
+
+            // Open the main window
+            let window_options = WindowOptions {
+                window_bounds: Some(WindowBounds::Windowed(Bounds {
+                    origin: point(px(100.0), px(100.0)),
+                    size: window_size,
+                })),
+                titlebar: Some(TitlebarOptions {
+                    title: Some("Manifest".into()),
+                    appears_transparent: false,
+                    ..Default::default()
+                }),
+                focus: true,
+                show: true,
+                kind: gpui::WindowKind::Normal,
+                is_movable: true,
+                app_id: Some("com.manifest.app".into()),
                 ..Default::default()
-            }),
-            focus: true,
-            show: true,
-            kind: gpui::WindowKind::Normal,
-            is_movable: true,
-            app_id: Some("com.manifest.app".into()),
-            ..Default::default()
-        };
-
-        let window_handle = cx
-            .open_window(window_options, |window, cx| {
-                cx.new(|cx| ManifestApp::new(window, cx))
-            })
-            .expect("Failed to open window");
-
-        // Register global actions (after window is created so we can reference it)
-        cx.on_action(|_: &Quit, cx| cx.quit());
-        cx.on_action(|_: &OpenRecent, _cx| {
-            eprintln!("Open Recent action triggered");
-        });
-
-        // Open action shows directory picker and loads project
-        let window_handle_for_open = window_handle.clone();
-        cx.on_action(move |_: &Open, cx| {
-            let options = PathPromptOptions {
-                files: false,
-                directories: true,
-                multiple: false,
-                prompt: Some("Open Manifest Project".into()),
             };
-            let paths_receiver = cx.prompt_for_paths(options);
-            let window_handle = window_handle_for_open.clone();
 
-            cx.spawn(async move |cx| {
-                if let Ok(Ok(Some(paths))) = paths_receiver.await {
-                    if let Some(path) = paths.into_iter().next() {
-                        eprintln!("Opening project: {:?}", path);
-                        cx.update(|cx| {
-                            let _ = window_handle.update(cx, |app, _window, cx| {
-                                app.open_project(path, cx);
-                            });
-                        });
-                    }
-                }
-            })
-            .detach();
+            // Create window with Root as the top-level view (required by gpui-component)
+            let _window_handle = cx
+                .open_window(window_options, |window, cx| {
+                    // Create the ManifestApp view
+                    let app_view = cx.new(|cx| ManifestApp::new(config, window, cx));
+                    // Wrap it in Root (required for gpui-component's theme and overlay system)
+                    cx.new(|cx| Root::new(app_view, window, cx))
+                })
+                .expect("Failed to open window");
+
+            // Register global actions
+            cx.on_action(|_: &Quit, cx| cx.quit());
+            cx.on_action(|_: &OpenRecent, _cx| {
+                eprintln!("Open Recent action triggered");
+            });
+
+            // Open action shows directory picker
+            // Note: We can't easily update ManifestApp from here without the Entity handle
+            // For now, this is a placeholder - proper implementation would store the Entity
+            cx.on_action(move |_: &Open, cx| {
+                let options = PathPromptOptions {
+                    files: false,
+                    directories: true,
+                    multiple: false,
+                    prompt: Some("Open Manifest Project".into()),
+                };
+                let _paths_receiver = cx.prompt_for_paths(options);
+                // TODO: Store Entity<ManifestApp> to update from here
+                eprintln!("Open action - directory picker shown");
+            });
+
+            cx.activate(true);
         });
-
-        cx.activate(true);
-    });
 }
