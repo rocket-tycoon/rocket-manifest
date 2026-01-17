@@ -885,6 +885,80 @@ speculate! {
             }
         }
 
+        describe "auto_state_transition" {
+            it "transitions proposed feature to specified on session creation" {
+                let project = create_test_project(&db);
+                let feature = db.create_feature(project.id, CreateFeatureInput {
+                    id: None,
+                    parent_id: None,
+                    title: "Proposed Feature".to_string(),
+                    details: None,
+                    priority: None,
+                    state: Some(FeatureState::Proposed),
+                }).expect("Failed to create");
+
+                // Verify initial state is proposed
+                assert_eq!(feature.state, FeatureState::Proposed);
+
+                // Create session
+                db.create_session(CreateSessionInput {
+                    feature_id: feature.id,
+                    goal: "Implement feature".to_string(),
+                    tasks: vec![],
+                }).expect("Failed to create session");
+
+                // Verify state was auto-transitioned to specified
+                let updated_feature = db.get_feature(feature.id).expect("Query failed").unwrap();
+                assert_eq!(updated_feature.state, FeatureState::Specified);
+            }
+
+            it "does not change state of already specified feature" {
+                let project = create_test_project(&db);
+                let feature = db.create_feature(project.id, CreateFeatureInput {
+                    id: None,
+                    parent_id: None,
+                    title: "Specified Feature".to_string(),
+                    details: None,
+                    priority: None,
+                    state: Some(FeatureState::Specified),
+                }).expect("Failed to create");
+
+                // Create session
+                db.create_session(CreateSessionInput {
+                    feature_id: feature.id,
+                    goal: "Implement feature".to_string(),
+                    tasks: vec![],
+                }).expect("Failed to create session");
+
+                // Verify state remains specified
+                let updated_feature = db.get_feature(feature.id).expect("Query failed").unwrap();
+                assert_eq!(updated_feature.state, FeatureState::Specified);
+            }
+
+            it "does not change state of implemented feature" {
+                let project = create_test_project(&db);
+                let feature = db.create_feature(project.id, CreateFeatureInput {
+                    id: None,
+                    parent_id: None,
+                    title: "Implemented Feature".to_string(),
+                    details: None,
+                    priority: None,
+                    state: Some(FeatureState::Implemented),
+                }).expect("Failed to create");
+
+                // Create session
+                db.create_session(CreateSessionInput {
+                    feature_id: feature.id,
+                    goal: "Additional work".to_string(),
+                    tasks: vec![],
+                }).expect("Failed to create session");
+
+                // Verify state remains implemented
+                let updated_feature = db.get_feature(feature.id).expect("Query failed").unwrap();
+                assert_eq!(updated_feature.state, FeatureState::Implemented);
+            }
+        }
+
         describe "complete_session" {
             it "returns None for non-existent session" {
                 let result = db.complete_session(Uuid::new_v4(), CompleteSessionInput {

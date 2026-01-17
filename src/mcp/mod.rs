@@ -894,8 +894,18 @@ FEATURE FIELDS:
 - title: Short capability name (2-5 words). What users can DO.
 - details: Feature specification including user stories, technical notes, constraints, acceptance criteria.
           User stories can follow "As a [user], I can [capability] so that [benefit]" format.
-- state: proposed (idea) → specified (ready to build) → implemented (done) → deprecated
+- state: Auto-managed lifecycle (proposed → specified → implemented → deprecated)
 - priority: Lower number = implement first. Use for sequencing.
+
+FEATURE STATES (auto-managed):
+- 'proposed': Initial idea, no active work
+- 'specified': Has an active session (auto-set when session is created)
+- 'implemented': Session completed (auto-set by complete_session with mark_implemented=true)
+- 'deprecated': Manually set only via update_feature_state
+
+State transitions happen automatically:
+- create_session on a 'proposed' feature → transitions to 'specified'
+- complete_session with mark_implemented=true → transitions to 'implemented'
 
 FEATURE vs TASK:
 - Feature = WHAT users can do (persists as documentation)

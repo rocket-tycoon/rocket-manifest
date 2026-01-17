@@ -879,7 +879,8 @@ impl Database {
     }
 
     pub fn create_session(&self, input: CreateSessionInput) -> Result<SessionResponse> {
-        self.get_feature(input.feature_id)?
+        let feature = self
+            .get_feature(input.feature_id)?
             .ok_or_else(|| ManifestError::not_found("Feature"))?;
 
         // Sessions can only be created on leaf features (no children)
@@ -905,6 +906,14 @@ impl Database {
                 now.to_rfc3339(),
             ),
         )?;
+
+        // Auto-transition feature from 'proposed' to 'specified'
+        if feature.state == FeatureState::Proposed {
+            tx.execute(
+                "UPDATE features SET state = 'specified', updated_at = ? WHERE id = ?",
+                (now.to_rfc3339(), input.feature_id.to_string()),
+            )?;
+        }
 
         let session = Session {
             id: session_id,
