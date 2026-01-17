@@ -24,7 +24,14 @@
       "Bash(git push:*)",
       "Bash(cargo update:*)",
       "Bash(cat:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(cargo check:*)",
+      "mcp__plugin_rocketindex_rocket-index__describe_project",
+      "Bash(ls:*)",
+      "Bash(tree:*)",
+      "Bash(git checkout:*)",
+      "mcp__plugin_manifest_manifest__search_features",
+      "mcp__plugin_manifest_manifest__get_feature"
     ]
   }
 }
