@@ -25,6 +25,64 @@ pub enum FeatureState {
     Deprecated,
 }
 
+/// Session status in the Manifest system.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SessionStatus {
+    Active,
+    Completed,
+    Failed,
+}
+
+/// Task status in the Manifest system.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TaskStatus {
+    Pending,
+    Running,
+    Completed,
+    Failed,
+}
+
+/// Agent type for task execution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AgentType {
+    Claude,
+    Gemini,
+    Codex,
+}
+
+/// A session in the Manifest system.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Session {
+    pub id: Uuid,
+    pub feature_id: Uuid,
+    pub goal: String,
+    pub status: SessionStatus,
+    pub created_at: String,
+    #[serde(default)]
+    pub completed_at: Option<String>,
+}
+
+/// A task in the Manifest system.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Task {
+    pub id: Uuid,
+    pub session_id: Uuid,
+    #[serde(default)]
+    pub parent_id: Option<Uuid>,
+    pub title: String,
+    pub scope: String,
+    pub status: TaskStatus,
+    pub agent_type: AgentType,
+    #[serde(default)]
+    pub worktree_path: Option<String>,
+    #[serde(default)]
+    pub branch: Option<String>,
+    pub created_at: String,
+}
+
 /// A feature in the Manifest system (matches FeatureTreeNode from API).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Feature {
@@ -159,6 +217,41 @@ impl ManifestClient {
         let url = format!("{}/features/{}", self.base_url, id);
         let body = serde_json::json!({ "details": details });
         let response: Feature = ureq::put(&url).send_json(&body)?.into_json()?;
+        Ok(response)
+    }
+
+    /// Update a feature's title and details (blocking).
+    pub fn update_feature_full(
+        &self,
+        id: &Uuid,
+        title: Option<String>,
+        details: Option<String>,
+    ) -> Result<Feature, ClientError> {
+        let url = format!("{}/features/{}", self.base_url, id);
+        let mut body = serde_json::Map::new();
+        if let Some(t) = title {
+            body.insert("title".to_string(), serde_json::Value::String(t));
+        }
+        if let Some(d) = details {
+            body.insert("details".to_string(), serde_json::Value::String(d));
+        }
+        let response: Feature = ureq::put(&url)
+            .send_json(&serde_json::Value::Object(body))?
+            .into_json()?;
+        Ok(response)
+    }
+
+    /// Get sessions for a feature (blocking).
+    pub fn get_feature_sessions(&self, feature_id: &Uuid) -> Result<Vec<Session>, ClientError> {
+        let url = format!("{}/features/{}/sessions", self.base_url, feature_id);
+        let response: Vec<Session> = ureq::get(&url).call()?.into_json()?;
+        Ok(response)
+    }
+
+    /// Get tasks for a session (blocking).
+    pub fn get_session_tasks(&self, session_id: &Uuid) -> Result<Vec<Task>, ClientError> {
+        let url = format!("{}/sessions/{}/tasks", self.base_url, session_id);
+        let response: Vec<Task> = ureq::get(&url).call()?.into_json()?;
         Ok(response)
     }
 }
