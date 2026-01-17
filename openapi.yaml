@@ -46,7 +46,7 @@ paths:
       summary: Health check
       operationId: health
       responses:
-        '200':
+        "200":
           description: Server is healthy
           content:
             application/json:
@@ -66,14 +66,14 @@ paths:
       summary: List all projects
       operationId: listProjects
       responses:
-        '200':
+        "200":
           description: List of projects ordered by name
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Project'
+                  $ref: "#/components/schemas/Project"
     post:
       tags: [Projects]
       summary: Create a new project
@@ -83,16 +83,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateProjectInput'
+              $ref: "#/components/schemas/CreateProjectInput"
       responses:
-        '201':
+        "201":
           description: Project created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Project'
-        '500':
-          $ref: '#/components/responses/InternalError'
+                $ref: "#/components/schemas/Project"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
   /projects/by-directory:
     get:
@@ -112,13 +112,13 @@ paths:
           description: Absolute directory path to look up
           example: "/Users/dev/projects/my-app/src"
       responses:
-        '200':
+        "200":
           description: Project with directories
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProjectWithDirectories'
-        '404':
+                $ref: "#/components/schemas/ProjectWithDirectories"
+        "404":
           description: No project found for the given directory
           content:
             text/plain:
@@ -128,20 +128,20 @@ paths:
 
   /projects/{id}:
     parameters:
-      - $ref: '#/components/parameters/ProjectId'
+      - $ref: "#/components/parameters/ProjectId"
     get:
       tags: [Projects]
       summary: Get a project with its directories
       operationId: getProject
       responses:
-        '200':
+        "200":
           description: Project with directories
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProjectWithDirectories'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/ProjectWithDirectories"
+        "404":
+          $ref: "#/components/responses/NotFound"
     put:
       tags: [Projects]
       summary: Update a project
@@ -151,43 +151,43 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateProjectInput'
+              $ref: "#/components/schemas/UpdateProjectInput"
       responses:
-        '200':
+        "200":
           description: Project updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Project'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/Project"
+        "404":
+          $ref: "#/components/responses/NotFound"
     delete:
       tags: [Projects]
       summary: Delete a project
       description: Deletes the project and cascades to all features, sessions, and tasks
       operationId: deleteProject
       responses:
-        '204':
+        "204":
           description: Project deleted
-        '404':
-          $ref: '#/components/responses/NotFound'
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /projects/{id}/directories:
     parameters:
-      - $ref: '#/components/parameters/ProjectId'
+      - $ref: "#/components/parameters/ProjectId"
     get:
       tags: [Directories]
       summary: List project directories
       operationId: listProjectDirectories
       responses:
-        '200':
+        "200":
           description: List of directories (primary first, then by path)
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/ProjectDirectory'
+                  $ref: "#/components/schemas/ProjectDirectory"
     post:
       tags: [Directories]
       summary: Add a directory to a project
@@ -197,20 +197,20 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AddDirectoryInput'
+              $ref: "#/components/schemas/AddDirectoryInput"
       responses:
-        '201':
+        "201":
           description: Directory added
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProjectDirectory'
-        '500':
-          $ref: '#/components/responses/InternalError'
+                $ref: "#/components/schemas/ProjectDirectory"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
   /projects/{id}/features:
     parameters:
-      - $ref: '#/components/parameters/ProjectId'
+      - $ref: "#/components/parameters/ProjectId"
     get:
       tags: [Features]
       summary: List all features in a project
@@ -219,17 +219,17 @@ paths:
         Always returns summaries only - use GET /features/{id} for full details.
       operationId: listProjectFeatures
       parameters:
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/Offset'
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
       responses:
-        '200':
+        "200":
           description: Feature summaries in the project
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/FeatureSummary'
+                  $ref: "#/components/schemas/FeatureSummary"
     post:
       tags: [Features]
       summary: Create a feature in a project
@@ -239,20 +239,20 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateFeatureInput'
+              $ref: "#/components/schemas/CreateFeatureInput"
       responses:
-        '201':
+        "201":
           description: Feature created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Feature'
-        '500':
-          $ref: '#/components/responses/InternalError'
+                $ref: "#/components/schemas/Feature"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
   /projects/{id}/features/bulk:
     parameters:
-      - $ref: '#/components/parameters/ProjectId'
+      - $ref: "#/components/parameters/ProjectId"
     post:
       tags: [Features]
       summary: Bulk create features with hierarchical structure
@@ -271,39 +271,39 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/BulkCreateFeaturesInput'
+              $ref: "#/components/schemas/BulkCreateFeaturesInput"
       responses:
-        '200':
+        "200":
           description: Proposed or created features
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PlanFeaturesResponse'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/InternalError'
+                $ref: "#/components/schemas/PlanFeaturesResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
   /projects/{id}/features/roots:
     parameters:
-      - $ref: '#/components/parameters/ProjectId'
+      - $ref: "#/components/parameters/ProjectId"
     get:
       tags: [Features]
       summary: List root features (no parent) in a project
       operationId: listRootFeatures
       responses:
-        '200':
+        "200":
           description: Root features ordered by title
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Feature'
+                  $ref: "#/components/schemas/Feature"
 
   /projects/{id}/features/tree:
     parameters:
-      - $ref: '#/components/parameters/ProjectId'
+      - $ref: "#/components/parameters/ProjectId"
     get:
       tags: [Features]
       summary: Get complete feature tree
@@ -312,30 +312,30 @@ paths:
         recursively nested. Useful for visualizing the full project structure.
       operationId: getFeatureTree
       responses:
-        '200':
+        "200":
           description: Feature tree with nested children
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/FeatureTreeNode'
+                  $ref: "#/components/schemas/FeatureTreeNode"
 
   # ============================================================
   # Directories (standalone)
   # ============================================================
   /directories/{id}:
     parameters:
-      - $ref: '#/components/parameters/DirectoryId'
+      - $ref: "#/components/parameters/DirectoryId"
     delete:
       tags: [Directories]
       summary: Remove a directory
       operationId: removeProjectDirectory
       responses:
-        '204':
+        "204":
           description: Directory removed
-        '404':
-          $ref: '#/components/responses/NotFound'
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   # ============================================================
   # Features (standalone)
@@ -349,17 +349,17 @@ paths:
         Always returns summaries only - use GET /features/{id} for full details.
       operationId: listFeatures
       parameters:
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/Offset'
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
       responses:
-        '200':
+        "200":
           description: Feature summaries
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/FeatureSummary'
+                  $ref: "#/components/schemas/FeatureSummary"
 
   /features/search:
     get:
@@ -393,31 +393,31 @@ paths:
             default: 10
           description: Maximum number of results to return. Defaults to 10.
       responses:
-        '200':
+        "200":
           description: Feature summaries matching the search query, ranked by relevance
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/FeatureSummary'
+                  $ref: "#/components/schemas/FeatureSummary"
 
   /features/{id}:
     parameters:
-      - $ref: '#/components/parameters/FeatureId'
+      - $ref: "#/components/parameters/FeatureId"
     get:
       tags: [Features]
       summary: Get a feature by ID
       operationId: getFeature
       responses:
-        '200':
+        "200":
           description: The feature
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Feature'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/Feature"
+        "404":
+          $ref: "#/components/responses/NotFound"
     put:
       tags: [Features]
       summary: Update a feature
@@ -427,65 +427,65 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateFeatureInput'
+              $ref: "#/components/schemas/UpdateFeatureInput"
       responses:
-        '200':
+        "200":
           description: Feature updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Feature'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/Feature"
+        "404":
+          $ref: "#/components/responses/NotFound"
     delete:
       tags: [Features]
       summary: Delete a feature
       description: Deletes the feature and cascades to all children
       operationId: deleteFeature
       responses:
-        '204':
+        "204":
           description: Feature deleted
-        '404':
-          $ref: '#/components/responses/NotFound'
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /features/{id}/children:
     parameters:
-      - $ref: '#/components/parameters/FeatureId'
+      - $ref: "#/components/parameters/FeatureId"
     get:
       tags: [Features]
       summary: List direct children of a feature
       operationId: listChildren
       responses:
-        '200':
+        "200":
           description: Direct children ordered by title
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Feature'
+                  $ref: "#/components/schemas/Feature"
 
   /features/{id}/history:
     parameters:
-      - $ref: '#/components/parameters/FeatureId'
+      - $ref: "#/components/parameters/FeatureId"
     get:
       tags: [Features]
       summary: Get feature history
       description: Returns the implementation history log (like git log)
       operationId: getFeatureHistory
       responses:
-        '200':
+        "200":
           description: History entries in reverse chronological order
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/FeatureHistory'
+                  $ref: "#/components/schemas/FeatureHistory"
 
   /features/{id}/diff:
     parameters:
-      - $ref: '#/components/parameters/FeatureId'
+      - $ref: "#/components/parameters/FeatureId"
     get:
       tags: [Features]
       summary: Get feature diff
@@ -494,34 +494,34 @@ paths:
         Use this to see what changes are pending before implementation.
       operationId: getFeatureDiff
       responses:
-        '200':
+        "200":
           description: Diff between current and desired state
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/FeatureDiff'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/FeatureDiff"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /features/{id}/sessions:
     parameters:
-      - $ref: '#/components/parameters/FeatureId'
+      - $ref: "#/components/parameters/FeatureId"
     get:
       tags: [Features]
       summary: List sessions for a feature
       description: Returns all sessions (active and completed) for this feature, ordered by creation date (newest first)
       operationId: listFeatureSessions
       responses:
-        '200':
+        "200":
           description: List of sessions for the feature
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Session'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                  $ref: "#/components/schemas/Session"
+        "404":
+          $ref: "#/components/responses/NotFound"
     post:
       tags: [Sessions]
       summary: Create a session on a feature (RESTful)
@@ -536,17 +536,17 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateFeatureSessionInput'
+              $ref: "#/components/schemas/CreateFeatureSessionInput"
       responses:
-        '201':
+        "201":
           description: Session created with tasks
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SessionResponse'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
+                $ref: "#/components/schemas/SessionResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
           description: Feature is not a leaf or already has active session
           content:
             application/json:
@@ -569,15 +569,15 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateSessionInput'
+              $ref: "#/components/schemas/CreateSessionInput"
       responses:
-        '201':
+        "201":
           description: Session created with tasks
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SessionResponse'
-        '500':
+                $ref: "#/components/schemas/SessionResponse"
+        "500":
           description: Feature is not a leaf or already has active session
           content:
             application/json:
@@ -586,41 +586,41 @@ paths:
 
   /sessions/{id}:
     parameters:
-      - $ref: '#/components/parameters/SessionId'
+      - $ref: "#/components/parameters/SessionId"
     get:
       tags: [Sessions]
       summary: Get a session by ID
       operationId: getSession
       responses:
-        '200':
+        "200":
           description: The session
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Session'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/Session"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /sessions/{id}/status:
     parameters:
-      - $ref: '#/components/parameters/SessionId'
+      - $ref: "#/components/parameters/SessionId"
     get:
       tags: [Sessions]
       summary: Get session status with task details
       operationId: getSessionStatus
       responses:
-        '200':
+        "200":
           description: Session status
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SessionStatusResponse'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/SessionStatusResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /sessions/{id}/complete:
     parameters:
-      - $ref: '#/components/parameters/SessionId'
+      - $ref: "#/components/parameters/SessionId"
     post:
       tags: [Sessions]
       summary: Complete a session
@@ -634,17 +634,17 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CompleteSessionInput'
+              $ref: "#/components/schemas/CompleteSessionInput"
       responses:
-        '200':
+        "200":
           description: Session completed
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SessionCompletionResult'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
+                $ref: "#/components/schemas/SessionCompletionResult"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
           description: Session already completed
           content:
             application/json:
@@ -653,23 +653,23 @@ paths:
 
   /sessions/{id}/tasks:
     parameters:
-      - $ref: '#/components/parameters/SessionId'
+      - $ref: "#/components/parameters/SessionId"
     get:
       tags: [Sessions]
       summary: List tasks in a session
       description: Returns all tasks belonging to this session
       operationId: listSessionTasks
       responses:
-        '200':
+        "200":
           description: List of tasks
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Task'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                  $ref: "#/components/schemas/Task"
+        "404":
+          $ref: "#/components/responses/NotFound"
     post:
       tags: [Sessions]
       summary: Create a task in a session
@@ -680,17 +680,17 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateTaskInput'
+              $ref: "#/components/schemas/CreateTaskInput"
       responses:
-        '201':
+        "201":
           description: Task created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Task'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
+                $ref: "#/components/schemas/Task"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
           description: Session is not active
           content:
             application/json:
@@ -702,20 +702,20 @@ paths:
   # ============================================================
   /tasks/{id}:
     parameters:
-      - $ref: '#/components/parameters/TaskId'
+      - $ref: "#/components/parameters/TaskId"
     get:
       tags: [Tasks]
       summary: Get a task by ID
       operationId: getTask
       responses:
-        '200':
+        "200":
           description: The task
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Task'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/Task"
+        "404":
+          $ref: "#/components/responses/NotFound"
     put:
       tags: [Tasks]
       summary: Update a task
@@ -725,12 +725,12 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateTaskInput'
+              $ref: "#/components/schemas/UpdateTaskInput"
       responses:
-        '200':
+        "200":
           description: Task updated
-        '404':
-          $ref: '#/components/responses/NotFound'
+        "404":
+          $ref: "#/components/responses/NotFound"
 
 components:
   parameters:
@@ -944,7 +944,7 @@ components:
         directories:
           type: array
           items:
-            $ref: '#/components/schemas/ProjectDirectory'
+            $ref: "#/components/schemas/ProjectDirectory"
 
     # ============================================================
     # Feature schemas
@@ -976,7 +976,7 @@ components:
           nullable: true
           description: Desired feature specification (what the feature SHOULD be). Non-null indicates pending changes.
         state:
-          $ref: '#/components/schemas/FeatureState'
+          $ref: "#/components/schemas/FeatureState"
         priority:
           type: integer
           default: 0
@@ -1017,7 +1017,7 @@ components:
           type: string
           example: "User Authentication"
         state:
-          $ref: '#/components/schemas/FeatureState'
+          $ref: "#/components/schemas/FeatureState"
         priority:
           type: integer
           default: 0
@@ -1038,7 +1038,7 @@ components:
           nullable: true
           description: Feature specification including user stories, implementation notes, and technical context
         state:
-          $ref: '#/components/schemas/FeatureState'
+          $ref: "#/components/schemas/FeatureState"
 
     UpdateFeatureInput:
       type: object
@@ -1054,7 +1054,7 @@ components:
           nullable: true
           description: Desired feature specification (what the feature SHOULD be). Set to plan pending changes.
         state:
-          $ref: '#/components/schemas/FeatureState'
+          $ref: "#/components/schemas/FeatureState"
         priority:
           type: integer
           description: Priority for ordering within parent
@@ -1068,7 +1068,7 @@ components:
           type: array
           description: The proposed feature tree to create
           items:
-            $ref: '#/components/schemas/ProposedFeature'
+            $ref: "#/components/schemas/ProposedFeature"
         confirm:
           type: boolean
           default: false
@@ -1100,7 +1100,7 @@ components:
           default: []
           description: Child features (for hierarchical structure)
           items:
-            $ref: '#/components/schemas/ProposedFeature'
+            $ref: "#/components/schemas/ProposedFeature"
 
     PlanFeaturesResponse:
       type: object
@@ -1111,7 +1111,7 @@ components:
           type: array
           description: The proposed feature tree (same as input, for review)
           items:
-            $ref: '#/components/schemas/ProposedFeature'
+            $ref: "#/components/schemas/ProposedFeature"
         created:
           type: boolean
           description: Whether the features were created (true if confirm=true was passed)
@@ -1127,14 +1127,14 @@ components:
       type: object
       description: A feature with its children recursively nested
       allOf:
-        - $ref: '#/components/schemas/Feature'
+        - $ref: "#/components/schemas/Feature"
         - type: object
           required: [children]
           properties:
             children:
               type: array
               items:
-                $ref: '#/components/schemas/FeatureTreeNode'
+                $ref: "#/components/schemas/FeatureTreeNode"
 
     FeatureHistory:
       type: object
@@ -1160,7 +1160,7 @@ components:
           type: array
           description: Git commits created during this work
           items:
-            $ref: '#/components/schemas/CommitRef'
+            $ref: "#/components/schemas/CommitRef"
         created_at:
           type: string
           format: date-time
@@ -1201,7 +1201,7 @@ components:
           type: string
           example: "Implement OAuth login with Google"
         status:
-          $ref: '#/components/schemas/SessionStatus'
+          $ref: "#/components/schemas/SessionStatus"
         created_at:
           type: string
           format: date-time
@@ -1226,7 +1226,7 @@ components:
         tasks:
           type: array
           items:
-            $ref: '#/components/schemas/CreateTaskInput'
+            $ref: "#/components/schemas/CreateTaskInput"
 
     CreateFeatureSessionInput:
       type: object
@@ -1241,31 +1241,31 @@ components:
           description: Initial tasks to create with the session
           default: []
           items:
-            $ref: '#/components/schemas/CreateTaskInput'
+            $ref: "#/components/schemas/CreateTaskInput"
 
     SessionResponse:
       type: object
       required: [session, tasks]
       properties:
         session:
-          $ref: '#/components/schemas/Session'
+          $ref: "#/components/schemas/Session"
         tasks:
           type: array
           items:
-            $ref: '#/components/schemas/Task'
+            $ref: "#/components/schemas/Task"
 
     SessionStatusResponse:
       type: object
       required: [session, feature, tasks]
       properties:
         session:
-          $ref: '#/components/schemas/Session'
+          $ref: "#/components/schemas/Session"
         feature:
-          $ref: '#/components/schemas/SessionFeatureSummary'
+          $ref: "#/components/schemas/SessionFeatureSummary"
         tasks:
           type: array
           items:
-            $ref: '#/components/schemas/Task'
+            $ref: "#/components/schemas/Task"
 
     SessionFeatureSummary:
       type: object
@@ -1288,9 +1288,9 @@ components:
           type: array
           description: Git commits created during this session
           items:
-            $ref: '#/components/schemas/CommitRef'
+            $ref: "#/components/schemas/CommitRef"
         feature_state:
-          $ref: '#/components/schemas/FeatureState'
+          $ref: "#/components/schemas/FeatureState"
           description: Optionally update the feature's state (e.g., to 'implemented')
 
     CommitRef:
@@ -1316,9 +1316,9 @@ components:
       required: [session, history_entry]
       properties:
         session:
-          $ref: '#/components/schemas/Session'
+          $ref: "#/components/schemas/Session"
         history_entry:
-          $ref: '#/components/schemas/FeatureHistory'
+          $ref: "#/components/schemas/FeatureHistory"
 
     # ============================================================
     # Task schemas
@@ -1344,9 +1344,9 @@ components:
           type: string
           description: Scope description for the agent
         status:
-          $ref: '#/components/schemas/TaskStatus'
+          $ref: "#/components/schemas/TaskStatus"
         agent_type:
-          $ref: '#/components/schemas/AgentType'
+          $ref: "#/components/schemas/AgentType"
         worktree_path:
           type: string
           nullable: true
@@ -1381,13 +1381,13 @@ components:
         scope:
           type: string
         agent_type:
-          $ref: '#/components/schemas/AgentType'
+          $ref: "#/components/schemas/AgentType"
 
     UpdateTaskInput:
       type: object
       properties:
         status:
-          $ref: '#/components/schemas/TaskStatus'
+          $ref: "#/components/schemas/TaskStatus"
         worktree_path:
           type: string
           nullable: true
