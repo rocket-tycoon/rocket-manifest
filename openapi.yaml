@@ -530,6 +530,8 @@ paths:
         `POST /sessions` where the feature ID comes from the URL path instead of the request body.
         Only leaf features (those without children) can have sessions.
         Only one active session per feature is allowed.
+
+        Side effect: If the feature is in 'proposed' state, it will be auto-transitioned to 'specified'.
       operationId: createFeatureSession
       requestBody:
         required: true
@@ -563,6 +565,8 @@ paths:
       description: |
         Creates a work session on a leaf feature. Only leaf features (those without children)
         can have sessions. Only one active session per feature is allowed.
+
+        Side effect: If the feature is in 'proposed' state, it will be auto-transitioned to 'specified'.
       operationId: createSession
       requestBody:
         required: true
