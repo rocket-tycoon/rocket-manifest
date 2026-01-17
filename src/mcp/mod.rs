@@ -1004,3 +1004,23 @@ pub async fn run_stdio_server() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+/// Create Axum router for Streamable HTTP MCP transport.
+///
+/// This provides SSE-based MCP transport at `/mcp` endpoint, allowing
+/// AI agents to access Manifest tools via HTTP instead of stdio.
+pub fn streamable_http_router() -> axum::Router {
+    use rmcp::transport::streamable_http_server::{
+        session::local::LocalSessionManager, tower::StreamableHttpService,
+    };
+    use std::sync::Arc;
+
+    let service = StreamableHttpService::new(
+        || Ok(McpServer::from_env()),
+        Arc::new(LocalSessionManager::default()),
+        Default::default(),
+    );
+
+    // Use fallback_service since nest_service at "/" is no longer supported in Axum 0.8
+    axum::Router::new().fallback_service(service)
+}

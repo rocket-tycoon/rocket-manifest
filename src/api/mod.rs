@@ -8,6 +8,7 @@ use axum::{
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 use crate::db::Database;
+use crate::mcp;
 
 pub use middleware::SecurityConfig;
 
@@ -134,9 +135,13 @@ pub fn create_router_with_config(db: Database, config: SecurityConfig) -> Router
     // Combine health (unauthenticated) with protected API
     let api = health_router.merge(protected_api);
 
+    // MCP router is stateless (uses its own HTTP client internally)
+    let mcp_router = mcp::streamable_http_router();
+
     Router::new()
         .nest("/api/v1", api)
+        .with_state(db)
+        .nest("/mcp", mcp_router)
         .layer(TraceLayer::new_for_http())
         .layer(cors_layer)
-        .with_state(db)
 }
