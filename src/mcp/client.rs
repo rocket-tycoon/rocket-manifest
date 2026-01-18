@@ -265,6 +265,30 @@ impl ManifestClient {
         self.handle_response(response).await
     }
 
+    /// Create a history entry directly on a feature (CLI mode).
+    /// Optionally marks the feature as implemented.
+    pub async fn create_feature_history(
+        &self,
+        feature_id: Uuid,
+        summary: &str,
+        commits: &[CommitRef],
+        mark_implemented: bool,
+    ) -> Result<FeatureHistory, ClientError> {
+        let response = self
+            .request(
+                reqwest::Method::POST,
+                &format!("/features/{}/history", feature_id),
+            )
+            .json(&serde_json::json!({
+                "summary": summary,
+                "commits": commits,
+                "mark_implemented": mark_implemented
+            }))
+            .send()
+            .await?;
+        self.handle_response(response).await
+    }
+
     /// Get the full feature tree for a project.
     pub async fn get_feature_tree(
         &self,

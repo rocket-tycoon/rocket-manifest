@@ -92,7 +92,10 @@ pub fn create_router_with_config(db: Database, config: SecurityConfig) -> Router
         .route("/features/{id}", delete(handlers::delete_feature))
         .route("/features/{id}/children", get(handlers::list_children))
         .route("/features/{id}/diff", get(handlers::get_feature_diff))
-        .route("/features/{id}/history", get(handlers::get_feature_history))
+        .route(
+            "/features/{id}/history",
+            get(handlers::get_feature_history).post(handlers::create_feature_history),
+        )
         .route(
             "/features/{id}/sessions",
             get(handlers::list_feature_sessions).post(handlers::create_feature_session),

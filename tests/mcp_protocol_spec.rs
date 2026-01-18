@@ -55,21 +55,35 @@ struct McpTestClient {
 }
 
 impl McpTestClient {
-    /// Spawn a new MCP server process with an isolated test database
+    /// Spawn a new MCP server process in CLI mode (default) with an isolated test database
     fn spawn() -> Self {
+        Self::spawn_with_mode(None)
+    }
+
+    /// Spawn a new MCP server process in IDE mode with an isolated test database
+    fn spawn_ide_mode() -> Self {
+        Self::spawn_with_mode(Some("ide"))
+    }
+
+    /// Spawn a new MCP server process with specified mode
+    fn spawn_with_mode(mode: Option<&str>) -> Self {
         // Create temp directory for test database
         let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
         let home_dir = temp_dir.path().to_path_buf();
 
-        let mut child = Command::new(env!("CARGO_BIN_EXE_mfst"))
-            .arg("mcp")
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_mfst"));
+        cmd.arg("mcp")
             .env("XDG_DATA_HOME", temp_dir.path())
             .env("HOME", temp_dir.path()) // For macOS directories crate
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("Failed to spawn mfst mcp");
+            .stderr(Stdio::null());
+
+        if let Some(m) = mode {
+            cmd.env("MANIFEST_MODE", m);
+        }
+
+        let mut child = cmd.spawn().expect("Failed to spawn mfst mcp");
 
         let stdout = child.stdout.take().expect("Failed to get stdout");
         let reader = BufReader::new(stdout);
@@ -192,8 +206,8 @@ mod protocol {
     }
 
     #[test]
-    fn tools_list_returns_all_tools() {
-        let mut client = McpTestClient::spawn();
+    fn tools_list_returns_cli_tools() {
+        let mut client = McpTestClient::spawn(); // CLI mode (default)
         client.initialize();
 
         let response = client.list_tools();
@@ -203,20 +217,64 @@ mod protocol {
         let tools = result.get("tools").expect("Expected tools array");
         let tools_array = tools.as_array().expect("Tools should be array");
 
-        // We have 21 tools
+        // CLI mode has 12 tools
         assert_eq!(
             tools_array.len(),
-            21,
-            "Expected 21 tools, got {}",
+            12,
+            "Expected 12 CLI tools, got {}",
             tools_array.len()
         );
 
-        // Verify tool names
+        // Verify CLI tool names
         let tool_names: Vec<&str> = tools_array
             .iter()
             .filter_map(|t| t.get("name").and_then(|n| n.as_str()))
             .collect();
 
+        // Discovery tools
+        assert!(tool_names.contains(&"get_project_context"));
+        assert!(tool_names.contains(&"list_features"));
+        assert!(tool_names.contains(&"search_features"));
+        assert!(tool_names.contains(&"get_feature"));
+        assert!(tool_names.contains(&"get_feature_history"));
+        assert!(tool_names.contains(&"render_feature_tree"));
+        // Setup tools
+        assert!(tool_names.contains(&"create_project"));
+        assert!(tool_names.contains(&"add_project_directory"));
+        assert!(tool_names.contains(&"create_feature"));
+        assert!(tool_names.contains(&"plan_features"));
+        // Work tools
+        assert!(tool_names.contains(&"start_feature"));
+        assert!(tool_names.contains(&"complete_feature"));
+    }
+
+    #[test]
+    fn tools_list_returns_ide_tools() {
+        let mut client = McpTestClient::spawn_ide_mode();
+        client.initialize();
+
+        let response = client.list_tools();
+        assert!(response.error.is_none(), "Expected success, got error");
+
+        let result = response.result.expect("Expected result");
+        let tools = result.get("tools").expect("Expected tools array");
+        let tools_array = tools.as_array().expect("Tools should be array");
+
+        // IDE mode has 21 tools
+        assert_eq!(
+            tools_array.len(),
+            21,
+            "Expected 21 IDE tools, got {}",
+            tools_array.len()
+        );
+
+        // Verify IDE-specific tool names
+        let tool_names: Vec<&str> = tools_array
+            .iter()
+            .filter_map(|t| t.get("name").and_then(|n| n.as_str()))
+            .collect();
+
+        // IDE-only tools
         assert!(tool_names.contains(&"get_task_context"));
         assert!(tool_names.contains(&"start_task"));
         assert!(tool_names.contains(&"complete_task"));
@@ -226,18 +284,14 @@ mod protocol {
         assert!(tool_names.contains(&"breakdown_feature"));
         assert!(tool_names.contains(&"list_session_tasks"));
         assert!(tool_names.contains(&"complete_session"));
-        assert!(tool_names.contains(&"list_features"));
-        assert!(tool_names.contains(&"search_features"));
-        assert!(tool_names.contains(&"get_feature"));
-        assert!(tool_names.contains(&"get_feature_history"));
-        assert!(tool_names.contains(&"get_project_context"));
-        assert!(tool_names.contains(&"render_feature_tree"));
-        assert!(tool_names.contains(&"update_feature_state"));
-        assert!(tool_names.contains(&"create_project"));
-        assert!(tool_names.contains(&"add_project_directory"));
-        assert!(tool_names.contains(&"create_feature"));
-        assert!(tool_names.contains(&"plan_features"));
         assert!(tool_names.contains(&"get_active_feature"));
+        assert!(tool_names.contains(&"update_feature_state"));
+        // Common tools
+        assert!(tool_names.contains(&"list_features"));
+        assert!(tool_names.contains(&"get_feature"));
+        assert!(tool_names.contains(&"get_project_context"));
+        assert!(tool_names.contains(&"create_project"));
+        assert!(tool_names.contains(&"create_feature"));
     }
 
     #[test]
@@ -353,7 +407,7 @@ mod tool_calls {
 
     #[test]
     fn full_session_workflow() {
-        let mut client = McpTestClient::spawn();
+        let mut client = McpTestClient::spawn_ide_mode(); // Session tools require IDE mode
         client.initialize();
 
         // Setup: create project and feature
@@ -505,9 +559,11 @@ mod active_feature {
     use super::*;
     use std::fs;
 
+    // Note: get_active_feature is an IDE-only tool
+
     #[test]
     fn returns_null_when_no_context_file() {
-        let mut client = McpTestClient::spawn();
+        let mut client = McpTestClient::spawn_ide_mode();
         client.initialize();
 
         let response = client.call_tool("get_active_feature", json!({}));
@@ -525,7 +581,7 @@ mod active_feature {
 
     #[test]
     fn returns_feature_when_context_file_exists() {
-        let mut client = McpTestClient::spawn();
+        let mut client = McpTestClient::spawn_ide_mode();
         client.initialize();
 
         // Write context file to the test's home directory
@@ -564,7 +620,7 @@ mod active_feature {
 
     #[test]
     fn returns_error_for_invalid_json_in_context_file() {
-        let mut client = McpTestClient::spawn();
+        let mut client = McpTestClient::spawn_ide_mode();
         client.initialize();
 
         // Write invalid JSON to context file
@@ -588,7 +644,7 @@ mod active_feature {
 
     #[test]
     fn preserves_all_context_fields() {
-        let mut client = McpTestClient::spawn();
+        let mut client = McpTestClient::spawn_ide_mode();
         client.initialize();
 
         // Write context with extra fields

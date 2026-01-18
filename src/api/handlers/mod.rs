@@ -205,6 +205,71 @@ pub async fn get_feature_history(
         .map_err(internal_error)
 }
 
+/// Input for creating a history entry directly on a feature (CLI mode).
+#[derive(Debug, Deserialize)]
+pub struct CreateFeatureHistoryInput {
+    pub summary: String,
+    #[serde(default)]
+    pub commits: Vec<CommitRef>,
+    /// If true, also update feature state to 'implemented'. Defaults to true.
+    #[serde(default = "default_true")]
+    pub mark_implemented: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+pub async fn create_feature_history(
+    State(db): State<Database>,
+    Path(feature_id): Path<Uuid>,
+    Json(input): Json<CreateFeatureHistoryInput>,
+) -> Result<(StatusCode, Json<FeatureHistory>), (StatusCode, String)> {
+    // Verify feature exists
+    let feature = db
+        .get_feature(feature_id)
+        .map_err(internal_error)?
+        .ok_or((StatusCode::NOT_FOUND, "Feature not found".to_string()))?;
+
+    // Verify it's a leaf feature
+    if !db.is_leaf(feature_id).map_err(internal_error)? {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Cannot create history on a non-leaf feature".to_string(),
+        ));
+    }
+
+    // Create history entry directly (no session)
+    let history = db
+        .create_history_entry(CreateHistoryInput {
+            feature_id,
+            session_id: None,
+            details: HistoryDetails {
+                summary: input.summary,
+                commits: input.commits,
+            },
+        })
+        .map_err(internal_error)?;
+
+    // Optionally update feature state to implemented
+    if input.mark_implemented && feature.state != FeatureState::Implemented {
+        db.update_feature(
+            feature_id,
+            UpdateFeatureInput {
+                parent_id: None,
+                title: None,
+                details: None,
+                desired_details: None,
+                state: Some(FeatureState::Implemented),
+                priority: None,
+            },
+        )
+        .map_err(internal_error)?;
+    }
+
+    Ok((StatusCode::CREATED, Json(history)))
+}
+
 pub async fn list_feature_sessions(
     State(db): State<Database>,
     Path(feature_id): Path<Uuid>,

@@ -1,8 +1,17 @@
 //! MCP server for AI-assisted feature development.
+//!
+//! Supports two modes:
+//! - CLI mode (default): 12 tools optimized for single-agent CLI workflows
+//! - IDE mode: 21 tools for multi-agent orchestration and IDE integration
+//!
+//! Set `MANIFEST_MODE=ide` to use IDE mode.
 
+mod cli;
 pub mod client;
 mod tree_render;
 mod types;
+
+pub use cli::CliMcpServer;
 
 use std::str::FromStr;
 
@@ -1063,16 +1072,30 @@ IMPORTANT:
     }
 }
 
+/// Check if IDE mode is enabled via MANIFEST_MODE environment variable.
+/// Defaults to CLI mode if not set or set to anything other than "ide".
+pub fn is_ide_mode() -> bool {
+    std::env::var("MANIFEST_MODE")
+        .map(|v| v.to_lowercase() == "ide")
+        .unwrap_or(false)
+}
+
 pub async fn run_stdio_server() -> anyhow::Result<()> {
     use tokio::io::{stdin, stdout};
 
-    tracing::info!("Starting MCP server via stdio");
-
-    let service = McpServer::from_env();
-    let server = service.serve((stdin(), stdout())).await?;
-
-    let quit_reason = server.waiting().await?;
-    tracing::info!("MCP server stopped: {:?}", quit_reason);
+    if is_ide_mode() {
+        tracing::info!("Starting MCP server via stdio (IDE mode)");
+        let service = McpServer::from_env();
+        let server = service.serve((stdin(), stdout())).await?;
+        let quit_reason = server.waiting().await?;
+        tracing::info!("MCP server stopped: {:?}", quit_reason);
+    } else {
+        tracing::info!("Starting MCP server via stdio (CLI mode)");
+        let service = CliMcpServer::from_env();
+        let server = service.serve((stdin(), stdout())).await?;
+        let quit_reason = server.waiting().await?;
+        tracing::info!("MCP server stopped: {:?}", quit_reason);
+    }
 
     Ok(())
 }
@@ -1081,18 +1104,27 @@ pub async fn run_stdio_server() -> anyhow::Result<()> {
 ///
 /// This provides SSE-based MCP transport at `/mcp` endpoint, allowing
 /// AI agents to access Manifest tools via HTTP instead of stdio.
+///
+/// Uses CLI mode by default. Set MANIFEST_MODE=ide for IDE mode.
 pub fn streamable_http_router() -> axum::Router {
     use rmcp::transport::streamable_http_server::{
         session::local::LocalSessionManager, tower::StreamableHttpService,
     };
     use std::sync::Arc;
 
-    let service = StreamableHttpService::new(
-        || Ok(McpServer::from_env()),
-        Arc::new(LocalSessionManager::default()),
-        Default::default(),
-    );
-
-    // Use fallback_service since nest_service at "/" is no longer supported in Axum 0.8
-    axum::Router::new().fallback_service(service)
+    if is_ide_mode() {
+        let service = StreamableHttpService::new(
+            || Ok(McpServer::from_env()),
+            Arc::new(LocalSessionManager::default()),
+            Default::default(),
+        );
+        axum::Router::new().fallback_service(service)
+    } else {
+        let service = StreamableHttpService::new(
+            || Ok(CliMcpServer::from_env()),
+            Arc::new(LocalSessionManager::default()),
+            Default::default(),
+        );
+        axum::Router::new().fallback_service(service)
+    }
 }
