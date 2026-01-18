@@ -631,7 +631,7 @@ impl McpServer {
     }
 
     #[tool(
-        description = "Render a project's feature tree as ASCII art with status symbols. Returns a visual tree showing feature hierarchy and states (• proposed, ○ specified, ● implemented, ✗ deprecated)."
+        description = "Render a project's feature tree as ASCII art with status symbols. Returns a visual tree showing feature hierarchy and states (◇ proposed, ○ specified, ● implemented, ✗ deprecated)."
     )]
     async fn render_feature_tree(
         &self,

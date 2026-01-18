@@ -2,7 +2,7 @@
 
 use crate::models::{FeatureState, FeatureTreeNode};
 
-const PROPOSED: char = '•';
+const PROPOSED: char = '◇';
 const SPECIFIED: char = '○';
 const IMPLEMENTED: char = '●';
 const DEPRECATED: char = '✗';
@@ -149,7 +149,7 @@ mod tests {
             ],
         )];
         let output = render_tree(&tree);
-        let expected = "Authentication\n├── ● Password Login\n├── ○ OAuth Integration\n│   ├── • Google Provider\n│   └── • GitHub Provider\n└── ✗ Legacy Basic Auth\n";
+        let expected = "Authentication\n├── ● Password Login\n├── ○ OAuth Integration\n│   ├── ◇ Google Provider\n│   └── ◇ GitHub Provider\n└── ✗ Legacy Basic Auth\n";
         assert_eq!(output, expected);
     }
 }
