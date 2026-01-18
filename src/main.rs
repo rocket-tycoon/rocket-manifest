@@ -1,7 +1,26 @@
 use clap::{Parser, Subcommand};
+use std::io::Write;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use manifest::{api, db, mcp};
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Print startup banner to the specified writer
+fn print_banner<W: Write>(mut w: W, mode: &str) {
+    let banner = format!(
+        r#"
+  █▀▄▀█ ▄▀█ █▄ █ █ █▀▀ █▀▀ █▀ ▀█▀
+  █ ▀ █ █▀█ █ ▀█ █ █▀  ██▄ ▄█  █
+
+  Living Feature Documentation
+  Version: {}
+  Mode:    {}
+"#,
+        VERSION, mode
+    );
+    let _ = writeln!(w, "{}", banner);
+}
 
 #[derive(Parser)]
 #[command(name = "mfst")]
@@ -73,6 +92,10 @@ async fn main() -> anyhow::Result<()> {
             // Allow env var override for container deployment
             let bind_addr = std::env::var("MANIFEST_BIND_ADDR").unwrap_or(bind);
 
+            print_banner(
+                std::io::stdout(),
+                &format!("HTTP Server ({}:{})", bind_addr, port),
+            );
             tracing::info!("Starting Manifest server on {}:{}", bind_addr, port);
 
             let db = db::Database::open_default()?;
@@ -88,6 +111,12 @@ async fn main() -> anyhow::Result<()> {
         Some(Commands::Mcp) => {
             // MCP server uses HTTP client to connect to the API
             // No local database needed - configure via MANIFEST_URL env var
+            let mode = if mcp::is_ide_mode() {
+                "MCP (IDE)"
+            } else {
+                "MCP (CLI)"
+            };
+            print_banner(std::io::stderr(), mode);
             mcp::run_stdio_server().await?;
         }
         Some(Commands::Status) => {
@@ -107,6 +136,10 @@ async fn main() -> anyhow::Result<()> {
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(17010);
 
+            print_banner(
+                std::io::stdout(),
+                &format!("HTTP Server ({}:{})", bind_addr, port),
+            );
             tracing::info!("Starting Manifest server on {}:{}", bind_addr, port);
 
             let db = db::Database::open_default()?;
