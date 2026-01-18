@@ -1,6 +1,7 @@
 //! MCP server for AI-assisted feature development.
 
 pub mod client;
+mod tree_render;
 mod types;
 
 use std::str::FromStr;
@@ -185,6 +186,56 @@ impl McpServer {
             feature_id: response.session.feature_id.to_string(),
             goal: response.session.goal,
             status: response.session.status.as_str().to_string(),
+        };
+
+        let json = serde_json::to_string_pretty(&result)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(CallToolResult::success(vec![Content::text(json)]))
+    }
+
+    #[tool(
+        description = "Get the active session for a feature, if one exists. Use this to check if a feature already has work in progress before attempting to create a new session. Returns the session details if an active session exists, or null if no active session. This is useful for recovering from 'already has an active session' errors."
+    )]
+    async fn get_feature_session(
+        &self,
+        params: Parameters<GetFeatureSessionRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let req = params.0;
+        let feature_id = Self::parse_uuid(&req.feature_id)?;
+
+        // Verify feature exists
+        self.client
+            .get_feature(feature_id)
+            .await
+            .map_err(Self::client_err)?;
+
+        // Get sessions for this feature
+        let sessions = self
+            .client
+            .get_sessions_by_feature(feature_id)
+            .await
+            .map_err(Self::client_err)?;
+
+        // Find the active session (if any)
+        let active_session = sessions
+            .into_iter()
+            .find(|s| s.status == SessionStatus::Active);
+        let has_active = active_session.is_some();
+
+        let result = FeatureSessionResponse {
+            feature_id: feature_id.to_string(),
+            session: active_session.map(|s| SessionInfo {
+                id: s.id.to_string(),
+                feature_id: s.feature_id.to_string(),
+                goal: s.goal,
+                status: s.status.as_str().to_string(),
+            }),
+            message: if has_active {
+                "Feature has an active session. Use this session or complete it before starting a new one.".to_string()
+            } else {
+                "No active session. You can create a new session with create_session or breakdown_feature.".to_string()
+            },
         };
 
         let json = serde_json::to_string_pretty(&result)
@@ -577,6 +628,27 @@ impl McpServer {
             .map_err(|e| McpError::internal_error(e.to_string(), None))?;
 
         Ok(CallToolResult::success(vec![Content::text(json)]))
+    }
+
+    #[tool(
+        description = "Render a project's feature tree as ASCII art with status symbols. Returns a visual tree showing feature hierarchy and states (• proposed, ○ specified, ● implemented, ✗ deprecated)."
+    )]
+    async fn render_feature_tree(
+        &self,
+        params: Parameters<RenderFeatureTreeRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let req = params.0;
+        let project_id = Self::parse_uuid(&req.project_id)?;
+
+        let tree = self
+            .client
+            .get_feature_tree(project_id)
+            .await
+            .map_err(Self::client_err)?;
+
+        let rendered = tree_render::render_tree(&tree);
+
+        Ok(CallToolResult::success(vec![Content::text(rendered)]))
     }
 
     #[tool(

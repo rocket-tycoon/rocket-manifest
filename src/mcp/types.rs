@@ -60,6 +60,12 @@ pub struct ListSessionTasksRequest {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetFeatureSessionRequest {
+    #[schemars(description = "The UUID of the feature to get the active session for")]
+    pub feature_id: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
 pub struct CompleteSessionRequest {
     #[schemars(description = "The UUID of the session to complete")]
     pub session_id: String,
@@ -293,6 +299,15 @@ pub struct TaskListResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct FeatureSessionResponse {
+    pub feature_id: String,
+    /// The active session for this feature, or null if no active session exists
+    pub session: Option<SessionInfo>,
+    /// Message explaining the result
+    pub message: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct CompleteSessionResponse {
     pub session_id: String,
     pub feature_id: String,
@@ -440,4 +455,10 @@ pub struct BreakdownFeatureResponse {
     pub session: SessionInfo,
     /// The created tasks, ready for agent assignment
     pub tasks: Vec<TaskInfo>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct RenderFeatureTreeRequest {
+    #[schemars(description = "The UUID of the project to render the feature tree for")]
+    pub project_id: String,
 }

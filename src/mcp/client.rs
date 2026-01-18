@@ -152,6 +152,21 @@ impl ManifestClient {
         self.handle_response(response).await
     }
 
+    /// Get sessions for a feature.
+    pub async fn get_sessions_by_feature(
+        &self,
+        feature_id: Uuid,
+    ) -> Result<Vec<Session>, ClientError> {
+        let response = self
+            .request(
+                reqwest::Method::GET,
+                &format!("/features/{}/sessions", feature_id),
+            )
+            .send()
+            .await?;
+        self.handle_response(response).await
+    }
+
     /// Create a new session on a feature.
     pub async fn create_session(
         &self,
@@ -245,6 +260,21 @@ impl ManifestClient {
     pub async fn get_feature_history(&self, id: Uuid) -> Result<Vec<FeatureHistory>, ClientError> {
         let response = self
             .request(reqwest::Method::GET, &format!("/features/{}/history", id))
+            .send()
+            .await?;
+        self.handle_response(response).await
+    }
+
+    /// Get the full feature tree for a project.
+    pub async fn get_feature_tree(
+        &self,
+        project_id: Uuid,
+    ) -> Result<Vec<FeatureTreeNode>, ClientError> {
+        let response = self
+            .request(
+                reqwest::Method::GET,
+                &format!("/projects/{}/features/tree", project_id),
+            )
             .send()
             .await?;
         self.handle_response(response).await

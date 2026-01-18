@@ -890,6 +890,19 @@ impl Database {
             );
         }
 
+        // Check for existing active session (only one allowed per feature)
+        let existing_sessions = self.get_sessions_by_feature(input.feature_id)?;
+        if let Some(active) = existing_sessions
+            .iter()
+            .find(|s| s.status == SessionStatus::Active)
+        {
+            return Err(ManifestError::invalid_state(format!(
+                "Feature already has an active session (id: {}). Complete or cancel it first.",
+                active.id
+            ))
+            .into());
+        }
+
         let mut conn = self.conn.lock().expect("database lock poisoned");
         let tx = conn.transaction()?;
 

@@ -488,6 +488,50 @@ mod session_leaf_validation {
         let body = response.text();
         assert!(body.contains("leaf"));
     }
+
+    #[tokio::test]
+    async fn rejects_duplicate_active_session() {
+        let server = setup();
+        let project = create_test_project(&server).await;
+
+        let feature = server
+            .post(&format!("/api/v1/projects/{}/features", project.id))
+            .json(&CreateFeatureInput {
+                id: None,
+                parent_id: None,
+                title: "Feature".to_string(),
+                state: None,
+                details: None,
+                priority: None,
+            })
+            .await
+            .json::<Feature>();
+
+        // First session should succeed
+        let first_session = server
+            .post("/api/v1/sessions")
+            .json(&CreateSessionInput {
+                feature_id: feature.id,
+                goal: "First session".to_string(),
+                tasks: vec![],
+            })
+            .await;
+        first_session.assert_status(StatusCode::CREATED);
+
+        // Second session on same feature should fail with 409 Conflict
+        let response = server
+            .post("/api/v1/sessions")
+            .json(&CreateSessionInput {
+                feature_id: feature.id,
+                goal: "Second session".to_string(),
+                tasks: vec![],
+            })
+            .await;
+
+        response.assert_status(StatusCode::CONFLICT);
+        let body = response.text();
+        assert!(body.contains("already has an active session"));
+    }
 }
 
 mod session_completion {
